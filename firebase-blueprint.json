@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "orders": {
+      "title": "Order",
+      "description": "Customer perfume orders placed via site checkout or Amina AI chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotalUSD": { "type": "number" },
+        "subtotalSSP": { "type": "number" },
+        "bundleDiscountUSD": { "type": "number" },
+        "bundleDiscountSSP": { "type": "number" },
+        "totalUSD": { "type": "number" },
+        "totalSSP": { "type": "number" },
+        "currency": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "deliveryCity": { "type": "string" },
+        "deliveryAddress": { "type": "string" },
+        "notes": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "telegramNotified": { "type": "boolean" },
+        "telegramError": { "type": "string" }
+      },
+      "required": ["id", "customerPhone", "totalUSD", "createdAt"]
+    },
+    "helpRequests": {
+      "title": "HelpRequest",
+      "description": "Customer support requests collected by Amina AI",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerQuery": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "telegramNotified": { "type": "boolean" }
+      },
+      "required": ["customerPhone", "customerQuery", "createdAt"]
+    }
+  }
+}

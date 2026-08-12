@@ -1,0 +1,6 @@
+{
+  "name": "Juba Fashion Hub - The 9 Collection Fragrances",
+  "description": "Best-selling 9PM & 9AM Afnan perfume collection for Juba Fashion Hub with automatic bundle discounts, live stock urgency alerts, same-day Juba delivery, and AI fragrance recommendation assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

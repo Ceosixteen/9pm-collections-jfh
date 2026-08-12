@@ -1,0 +1,917 @@
+import express from 'express';
+import { GoogleGenAI } from '@google/genai';
+import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG, PERFUMES_DATA } from '../../src/data/perfumesData.js';
+import { KnowledgeBase, TelegramConfig, Order } from '../../src/types.js';
+import { db, setDoc, doc, collection, getDocs, query, orderBy, limit } from '../../src/lib/firebase.js';
+
+// In-memory state
+let currentKnowledgeBase: KnowledgeBase = { ...INITIAL_KNOWLEDGE_BASE };
+let currentTelegramConfig: TelegramConfig = {
+  ...DEFAULT_TELEGRAM_CONFIG,
+  botToken: process.env.TELEGRAM_BOT_TOKEN || DEFAULT_TELEGRAM_CONFIG.botToken,
+  chatId: process.env.TELEGRAM_CHAT_ID || DEFAULT_TELEGRAM_CONFIG.chatId,
+  enabled: true,
+};
+let ordersStore: Order[] = [];
+
+// Initialize Gemini AI client
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    },
+  },
+});
+
+// Smart Rule Engine Fallback when Gemini API key is unavailable or rate-limited
+function generateSmartFallbackResponse(userText: string, currency: string): string {
+  const query = userText.toLowerCase();
+
+  if (query.includes('night') || query.includes('club') || query.includes('party') || query.includes('date') || query.includes('attract') || query.includes('rebel') || query.includes('elixir')) {
+    return `Jambo handsome! For high-impact night projection in Juba, I highly recommend 9PM Rebel ($40 / 320,000 SSP) or 9PM Elixir ($40 / 320,000 SSP). 9PM Rebel has magnetic pineapple, mandarin, and warm woods that make heads turn immediately. Should I add 9PM Rebel to your cart? [RECOMMEND: 9pm-rebel]`;
+  }
+
+  if (query.includes('day') || query.includes('office') || query.includes('fresh') || query.includes('summer') || query.includes('dive')) {
+    return `Hello darling! For fresh daytime confidence and office heat, 9AM Dive ($40 / 320,000 SSP) is unmatched with iced mint, juicy lemon, and smooth sandalwood. Would you like me to reserve a bottle for 120-minute delivery in Juba? [RECOMMEND: 9am-dive]`;
+  }
+
+  if (query.includes('women') || query.includes('lady') || query.includes('female') || query.includes('pour femme') || query.includes('gift')) {
+    return `Aww, looking for a luxurious scent for a special woman? 9PM Pour Femme ($35 / 280,000 SSP) is a breathtaking blend of raspberry, peony, iris, and warm cedar-amber. Should I prepare a bottle for express dispatch today? [RECOMMEND: 9pm-pour-femme]`;
+  }
+
+  if (query.includes('price') || query.includes('cost') || query.includes('ssp') || query.includes('usd') || query.includes('discount')) {
+    return `Darling, our authentic Afnan 100ml EDP bottles are priced at $35–$40 USD (${currency === 'SSP' ? '280,000–320,000 SSP' : '$35–$40'}). Plus, if you order 2 or more bottles today, you automatically get a -$5 USD discount per bottle! Which fragrance shall we get for you?`;
+  }
+
+  if (query.includes('deliver') || query.includes('juba') || query.includes('location') || query.includes('time') || query.includes('ship')) {
+    return `We offer FREE Express 120-minute delivery anywhere in Juba today! We deliver directly to your office or doorstep. You can pay Cash (USD or SSP) or via m-GURUSH upon delivery. Where in Juba are you located?`;
+  }
+
+  if (query.includes('order') || query.includes('buy') || query.includes('purchase')) {
+    return `I would love to place your order directly right now! Please share your Full Name, Phone Number, Juba Delivery Location, and choice of perfume (e.g., 9PM Rebel).`;
+  }
+
+  return `Jambo! Welcome to Juba Fashion Hub. I am Amina, your personal fragrance specialist. Are you looking for a seductive night fragrance like 9PM Rebel or a fresh daytime scent like 9AM Dive? Tell me what vibe you want!`;
+}
+
+// Firestore Persistence Helpers
+async function saveOrderToFirestore(order: Order) {
+  try {
+    await setDoc(doc(db, 'orders', order.id), order);
+  } catch (err) {
+    console.error('Failed to save order to Firestore:', err);
+  }
+}
+
+async function saveHelpRequestToFirestore(helpData: { customerPhone: string; customerQuery: string; telegramNotified: boolean }) {
+  try {
+    const id = `HELP-${Date.now()}`;
+    await setDoc(doc(db, 'helpRequests', id), {
+      id,
+      ...helpData,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Failed to save help request to Firestore:', err);
+  }
+}
+
+// Telegram Helper for Alex (Admin Backend Assistant)
+function generateAlexFallbackResponse(
+  query: string,
+  totalOrders: number,
+  totalUSD: number,
+  totalSSP: number,
+  orders: Order[],
+  helpRequests: any[]
+): string {
+  const q = query.toLowerCase();
+
+  if (q.includes('order') || q.includes('sale') || q.includes('recent') || q.includes('list')) {
+    if (orders.length === 0) {
+      return `📊 Juba Fashion Hub Operations Update\n\nNo orders registered in the system yet. Store is active and ready for orders!`;
+    }
+    const top3 = orders.slice(0, 3).map(o => `• #${o.id}: ${o.customerName} (${o.customerPhone}) - $${o.totalUSD} / ${o.totalSSP.toLocaleString()} SSP\n  Items: ${o.items.map(i => i.productName).join(', ')} (${o.deliveryAddress})`).join('\n\n');
+    return `📊 Juba Fashion Hub - Recent Orders\n\nTotal Orders: ${totalOrders}\nGross Revenue: $${totalUSD} USD / ${totalSSP.toLocaleString()} SSP\n\nTop Recent Orders:\n${top3}`;
+  }
+
+  if (q.includes('revenue') || q.includes('money') || q.includes('total') || q.includes('income')) {
+    return `💰 Juba Fashion Hub Revenue Summary\n\n• Total Orders Processed: ${totalOrders}\n• Total Revenue (USD): $${totalUSD} USD\n• Total Revenue (SSP): ${totalSSP.toLocaleString()} SSP\n• Express Delivery Zone: Juba (120-min dispatch)`;
+  }
+
+  if (q.includes('help') || q.includes('query') || q.includes('customer') || q.includes('support')) {
+    if (helpRequests.length === 0) {
+      return `💬 Customer Support Desk\n\nNo pending customer support queries at the moment! Amina is handling website sales smoothly.`;
+    }
+    const reqs = helpRequests.slice(0, 3).map(h => `• ${h.customerPhone}: "${h.customerQuery}"`).join('\n');
+    return `💬 Recent Customer Help Requests:\n\n${reqs}`;
+  }
+
+  if (q.includes('price') || q.includes('stock') || q.includes('inventory') || q.includes('perfume')) {
+    return `📦 The 9 Collection - Stock & Prices\n\n• 9PM Rebel: $40 / 320,000 SSP\n• 9PM Elixir: $40 / 320,000 SSP\n• 9PM Black Classic: $35 / 280,000 SSP\n• 9AM Dive: $40 / 320,000 SSP\n• 9PM Pour Femme: $35 / 280,000 SSP\n\nAll 100ml EDP authentic imports.`;
+  }
+
+  return `👨‍💼 Alex - Admin Operations Assistant\n\nHello Admin! I am Alex, your backend store operations assistant for Juba Fashion Hub.\n\nI can assist you with:\n• Orders & Sales (ask "show orders")\n• Revenue Stats (ask "total revenue")\n• Customer Enquiries (ask "customer queries")\n• Inventory & Pricing (ask "stock and prices")`;
+}
+
+async function getAlexTelegramReply(incomingText: string, senderName: string): Promise<string> {
+  let allOrders: Order[] = [...ordersStore];
+  try {
+    const snapshot = await getDocs(query(collection(db, 'orders'), limit(50)));
+    const firestoreOrders = snapshot.docs.map(d => d.data() as Order);
+    const orderMap = new Map<string, Order>();
+    firestoreOrders.forEach(o => orderMap.set(o.id, o));
+    allOrders.forEach(o => { if (!orderMap.has(o.id)) orderMap.set(o.id, o); });
+    allOrders = Array.from(orderMap.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } catch (e) {
+    // ignore
+  }
+
+  let helpRequests: any[] = [];
+  try {
+    const snapshot = await getDocs(query(collection(db, 'helpRequests'), limit(20)));
+    helpRequests = snapshot.docs.map(d => d.data());
+  } catch (e) {
+    // ignore
+  }
+
+  const totalOrdersCount = allOrders.length;
+  const totalUSDRevenue = allOrders.reduce((sum, o) => sum + (o.totalUSD || 0), 0);
+  const totalSSPRevenue = allOrders.reduce((sum, o) => sum + (o.totalSSP || 0), 0);
+
+  const recentOrdersSummary = allOrders.slice(0, 5).map((o, idx) => {
+    const itemsStr = o.items.map(i => `${i.quantity}x ${i.productName}`).join(', ');
+    return `${idx + 1}. #${o.id} - ${o.customerName} (${o.customerPhone}) - Items: [${itemsStr}] - Total: $${o.totalUSD} / ${o.totalSSP.toLocaleString()} SSP - Address: ${o.deliveryAddress}`;
+  }).join('\n');
+
+  const recentHelpSummary = helpRequests.slice(0, 5).map((h, idx) => {
+    return `${idx + 1}. Customer ${h.customerPhone}: "${h.customerQuery}"`;
+  }).join('\n');
+
+  const alexSystemPrompt = `
+You are Alex, the Admin's Backend Store Manager & Operations AI Assistant for Juba Fashion Hub in South Sudan.
+You are talking directly to the Store Admin (${senderName}) on Telegram.
+
+YOUR IDENTITY & ROLE:
+- Name: Alex (Admin Backend Operations Assistant).
+- Role: You help the Admin monitor sales, store metrics, orders, customer help requests, inventory, delivery status, and operational questions.
+- You are NOT a frontend client sales agent. Amina handles customer sales on the website. You handle backend store operations for the Admin.
+
+LIVE STORE DATA IN JUBA FASHION HUB:
+- Total Store Orders: ${totalOrdersCount}
+- Total Gross Revenue: $${totalUSDRevenue} USD / ${totalSSPRevenue.toLocaleString()} SSP
+- Top/Recent Orders:\n${recentOrdersSummary || 'No orders registered yet.'}
+- Recent Customer Support Requests forwarded from site:\n${recentHelpSummary || 'No pending customer queries.'}
+
+PRODUCTS & PRICING (Afnan 100ml EDP):
+1. 9PM Rebel ($40 / 320,000 SSP)
+2. 9PM Elixir ($40 / 320,000 SSP)
+3. 9PM Black Classic ($35 / 280,000 SSP)
+4. 9AM Dive ($40 / 320,000 SSP)
+5. 9PM Pour Femme ($35 / 280,000 SSP)
+
+STORE OPERATIONAL POLICIES:
+- Delivery: FREE 120-minute Express Dispatch across Juba, South Sudan.
+- Hours: Monday - Sunday, 9:00 AM – 4:30 PM.
+- Payment Methods: Cash (USD/SSP), Bank Transfer, m-GURUSH.
+
+INSTRUCTIONS FOR ALEX:
+1. Address the admin professionally, directly, and concisely ("Hello Admin!", "Here is your store update...").
+2. Answer their question clearly using the live store data provided.
+3. Keep response clean and easy to read on Telegram.
+4. If they ask "Who are you?", introduce yourself as Alex, their Admin Operations & Store Assistant.
+`;
+
+  try {
+    const aiRes = await ai.models.generateContent({
+      model: 'gemini-3.6-flash',
+      contents: `Admin query: "${incomingText}"`,
+      config: {
+        systemInstruction: alexSystemPrompt,
+        temperature: 0.5,
+      },
+    });
+
+    if (aiRes.text && aiRes.text.trim()) {
+      return aiRes.text.trim();
+    }
+  } catch (err) {
+    console.warn('Alex Gemini call failed, using smart admin fallback:', err);
+  }
+
+  return generateAlexFallbackResponse(incomingText, totalOrdersCount, totalUSDRevenue, totalSSPRevenue, allOrders, helpRequests);
+}
+
+export function createApp(): express.Express {
+  const app = express();
+  app.use(express.json());
+
+  // Helper to format Telegram Order Message for Juba Fashion Hub
+  function formatTelegramOrderMessage(order: Order): string {
+    const totalFormatted = order.currency === 'SSP'
+      ? `SSP ${order.totalSSP.toLocaleString()}`
+      : `$${order.totalUSD.toLocaleString()} USD`;
+
+    const itemsText = order.items
+      .map(
+        (item) =>
+          `• <b>${item.quantity}x ${item.productName}</b>\n  Price: ${order.currency === 'SSP' ? `SSP ${(item.unitPriceUSD * 8000).toLocaleString()}` : `$${item.unitPriceUSD}`}`
+      )
+      .join('\n');
+
+    const discountInfo = order.bundleDiscountUSD > 0
+      ? `\n🎁 <b>AUTOMATIC BUNDLE DISCOUNT APPLIED:</b> -$${order.bundleDiscountUSD} USD (SSP ${order.bundleDiscountSSP.toLocaleString()} off!)`
+      : '';
+
+    return `🌸 <b>JUBA FASHION HUB - NEW PERFUME ORDER (#${order.id})</b>\n\n` +
+      `👤 <b>Customer Name:</b> ${order.customerName}\n` +
+      `📞 <b>Phone Number:</b> ${order.customerPhone}\n` +
+      `📍 <b>City:</b> ${order.deliveryCity}\n` +
+      `🏠 <b>Delivery Address in Juba:</b> ${order.deliveryAddress}\n` +
+      `💳 <b>Payment Method:</b> ${order.paymentMethod.toUpperCase()}\n` +
+      `💵 <b>Payment Currency:</b> ${order.currency}\n\n` +
+      `🛍️ <b>BOTTLES ORDERED:</b>\n${itemsText}${discountInfo}\n\n` +
+      `💰 <b>FINAL AMOUNT DUE:</b> <b>${totalFormatted}</b>\n\n` +
+      `🚚 <b>Delivery Status:</b> FREE 120-MIN EXPRESS JUBA DISPATCH\n` +
+      `📅 <b>Order Time:</b> ${new Date(order.createdAt).toLocaleString()}\n` +
+      `✨ <i>Juba Fashion Hub - The 9 Collection</i>`;
+  }
+
+  // 1. AI Fragrance Sales Agent Chat API Endpoint
+  app.post('/api/chat', async (req, res) => {
+    try {
+      const { message, chatHistory, selectedCurrency = 'SSP' } = req.body;
+
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      // System Prompt for Amina - Flirty AI Sales Specialist & Order Concierge
+      const systemInstruction = `
+You are Amina, the flirty, charming, and seductive AI Fragrance Partner & Sales Specialist for Juba Fashion Hub in South Sudan.
+
+CRITICAL COMMUNICATION RULES:
+1. SHORT & CONCISE: Never give long boring details or giant dumps of notes. Keep your messages short, friendly, and direct (max 2-3 short sentences).
+2. ASK CLIENT TO SPECIFY NEED: Always prompt the client to specify what they need or where they plan to wear the scent.
+3. STRICT NO BOLDING RULE: Absolutely DO NOT use bold text formatting (do NOT use **asterisks** or <b>tags</b>). Write all text in clean, normal, plain text only.
+
+HELP / HUMAN ASSISTANCE FORWARDING:
+- Whenever a client asks for human help, custom assistance, bulk wholesale prices, or wants someone from the team to contact them, politely ask for their Phone Number and their Query / Issue.
+- As soon as the client shares their phone number and what they need help with, respond warmly and append this tag at the VERY END of your message:
+[FORWARD_HELP: {"customerPhone":"Phone Number", "customerQuery":"Detailed explanation of what client needs help with"}]
+
+PERSONALITY & TONE:
+- Flirty, warm, elegant, playful, and confident ("Jambo handsome...", "Hello darling...", "Looking to make heads turn in Juba tonight?").
+- Focus on emotion: Sell how they will feel and the compliments they will receive.
+- Masterful objection handling:
+  * "Is it expensive?": "Darling, true luxury beast-mode projection is an investment in your confidence. Plus, if you grab 2 bottles today, I automatically take -$5 off EACH bottle ($10 / 80,000 SSP total savings)!"
+  * "Is it original?": "100% authentic imported Afnan bottles, guaranteed! Your presence deserves nothing less."
+
+AFNAN 100ML EDP COLLECTION (Quick Specs):
+1. 9PM Rebel ($40 / 320,000 SSP | EDP 100ml): Mandarin, Pineapple, Apple, Caramel & Dry Woods. Best for nighttime, clubs, high-energy evenings.
+2. 9PM Elixir ($40 / 320,000 SSP | EDP 100ml): Cardamom, Nutmeg, Leather, Lavender & Labdanum. Best for formal nights, winter galas, romantic dates.
+3. 9PM Black Classic ($35 / 280,000 SSP | EDP 100ml): Apple, Cinnamon, Vanilla, Amber & Tonka Bean. All-time night compliment magnet.
+4. 9AM Dive ($40 / 320,000 SSP | EDP 100ml): Mint, Lemon, Apple, Incense & Sandalwood. Best for daytime, office, gym, summer heat.
+5. 9PM Pour Femme ($35 / 280,000 SSP | EDP 100ml): Raspberry, Apple, Peony, Iris & Cedar-Amber. Luxurious feminine signature.
+
+BUSINESS & LOCATION DETAILS:
+- We are an online store based in Juba, South Sudan.
+- We own private warehouses where we import items directly from suppliers and dispatch our dedicated riders to deliver across Juba.
+- Operating Hours: Monday to Sunday, 9:00 AM – 4:30 PM.
+
+DELIVERY & CHECKOUT RULES IN JUBA:
+- FREE Express Delivery anywhere in Juba within 120 minutes (2 hours).
+- Remind clients delivery is strictly for TODAY in Juba.
+- Exchange Rate: $1 USD = 8,000 SSP ($40 = 320,000 SSP, $35 = 280,000 SSP).
+- Payment Options: USD Cash/Bank ($0 fee), SSP Cash ($0 fee), or SSP Bank/m-GURUSH (50% liquidation fee added).
+
+ORDER CREATION:
+- If client wants to order, get: Name, Phone, Delivery Address, Payment Method, Selected Perfume.
+- Append order tag at VERY END: [CREATE_ORDER: {"customerName":"Name", "customerPhone":"Phone", "deliveryAddress":"Address", "items":[{"productId":"9pm-rebel","quantity":1}], "paymentMethod":"cod", "currency":"USD"}]
+- Valid Product IDs: 9pm-rebel, 9pm-elixir, 9pm-normal, 9am-dive, 9pm-pour-femme.
+- PaymentMethods: "cod", "bank_transfer", "m-gurush"
+- If recommending a product without placing an order yet, you can also append: [RECOMMEND: product_id]
+- REMEMBER: No bold text anywhere!
+`;
+
+      const promptText = `
+User Question: "${message}"
+Selected Currency Context: ${selectedCurrency}
+
+Previous Chat Context:
+${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender}: ${m.text}`).join('\n') : ''}
+      `;
+
+      let responseText = '';
+
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.6-flash',
+          contents: promptText,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+          },
+        });
+        responseText = response.text || '';
+      } catch (e1) {
+        console.warn('gemini-3.6-flash failed, trying gemini-2.5-flash:', e1);
+        try {
+          const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: promptText,
+            config: {
+              systemInstruction,
+              temperature: 0.7,
+            },
+          });
+          responseText = response.text || '';
+        } catch (e2) {
+          console.warn('gemini-2.5-flash failed, using smart fallback engine:', e2);
+          responseText = generateSmartFallbackResponse(message, selectedCurrency);
+        }
+      }
+
+      if (!responseText) {
+        responseText = generateSmartFallbackResponse(message, selectedCurrency);
+      }
+
+      let recommendedProductId: string | undefined = undefined;
+      let orderPayload: any = undefined;
+      let helpForwarded = false;
+
+      const recommendMatch = responseText.match(/\[RECOMMEND:\s*([a-zA-Z0-9_-]+)\]/);
+      if (recommendMatch && recommendMatch[1]) {
+        recommendedProductId = recommendMatch[1];
+      }
+
+      // Handle Help Forwarding to Telegram
+      const helpMatch = responseText.match(/\[FORWARD_HELP:\s*(\{.*?\})\]/s);
+      if (helpMatch && helpMatch[1]) {
+        try {
+          const helpData = JSON.parse(helpMatch[1]);
+          const customerPhone = helpData.customerPhone || 'Not specified';
+          const customerQuery = helpData.customerQuery || 'Requested human support';
+
+          const botToken = process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+          const chatId = process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId;
+
+          if (currentTelegramConfig.enabled && botToken && chatId) {
+            const tgUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+            const helpMsgText =
+              `🚨 <b>JUBA FASHION HUB - CUSTOMER HELP REQUEST</b>\n\n` +
+              `📞 <b>Customer Phone:</b> ${customerPhone}\n` +
+              `💬 <b>Client Question / Request:</b> ${customerQuery}\n` +
+              `📅 <b>Time:</b> ${new Date().toLocaleString()}\n\n` +
+              `✨ <i>Amina AI collected this query and forwarded it to your Telegram bot. Please contact this client directly!</i>`;
+
+            await fetch(tgUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: helpMsgText,
+                parse_mode: 'HTML',
+              }),
+            });
+            helpForwarded = true;
+          }
+
+          // Always save help request to Firestore
+          await saveHelpRequestToFirestore({
+            customerPhone,
+            customerQuery,
+            telegramNotified: helpForwarded,
+          });
+        } catch (err) {
+          console.error('Failed to forward client help to Telegram:', err);
+        }
+      }
+
+      // Handle Direct Chat Order Creation & Telegram Notification
+      const orderMatch = responseText.match(/\[CREATE_ORDER:\s*(\{.*?\})\]/s);
+      if (orderMatch && orderMatch[1]) {
+        try {
+          orderPayload = JSON.parse(orderMatch[1]);
+          const orderId = `JFH-${Math.floor(100000 + Math.random() * 900000)}`;
+
+          const itemsList = (orderPayload.items || []).map((it: any) => {
+            const perfume = PERFUMES_DATA.find((p) => p.id === it.productId) || PERFUMES_DATA[0];
+            return {
+              productId: perfume.id,
+              productName: perfume.name,
+              quantity: it.quantity || 1,
+              unitPriceUSD: perfume.priceUSD,
+              unitPriceSSP: perfume.priceSSP,
+            };
+          });
+
+          const subtotalUSD = itemsList.reduce((acc: number, it: any) => acc + it.unitPriceUSD * it.quantity, 0);
+          const subtotalSSP = subtotalUSD * 8000;
+          const totalCount = itemsList.reduce((acc: number, it: any) => acc + it.quantity, 0);
+          const bundleDiscountUSD = totalCount >= 2 ? totalCount * 5 : 0;
+          const bundleDiscountSSP = bundleDiscountUSD * 8000;
+          const totalUSD = Math.max(0, subtotalUSD - bundleDiscountUSD);
+          const totalSSP = Math.max(0, subtotalSSP - bundleDiscountSSP);
+
+          const chatOrder: Order = {
+            id: orderId,
+            items: itemsList,
+            subtotalUSD,
+            subtotalSSP,
+            bundleDiscountUSD,
+            bundleDiscountSSP,
+            totalUSD,
+            totalSSP,
+            currency: orderPayload.currency || selectedCurrency || 'SSP',
+            customerName: orderPayload.customerName || 'Chat Customer',
+            customerPhone: orderPayload.customerPhone || 'N/A',
+            customerEmail: '',
+            deliveryCity: 'Juba',
+            deliveryAddress: orderPayload.deliveryAddress || 'Juba Town',
+            notes: 'Placed directly via Amina AI Sales Specialist',
+            paymentMethod: orderPayload.paymentMethod || 'cod',
+            paymentStatus: 'pending',
+            createdAt: new Date().toISOString(),
+            telegramNotified: false,
+          };
+
+          const botToken = process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+          const chatId = process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId;
+
+          if (currentTelegramConfig.enabled && botToken && chatId) {
+            try {
+              const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+              const messageText = formatTelegramOrderMessage(chatOrder);
+
+              const tgRes = await fetch(telegramUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  text: messageText,
+                  parse_mode: 'HTML',
+                }),
+              });
+
+              const tgData: any = await tgRes.json();
+              if (tgData && tgData.ok) {
+                chatOrder.telegramNotified = true;
+              } else {
+                chatOrder.telegramError = tgData?.description || 'Telegram non-ok response';
+              }
+            } catch (tgErr: any) {
+              console.error('Chat order Telegram notification error:', tgErr);
+              chatOrder.telegramError = tgErr?.message || String(tgErr);
+            }
+          }
+
+          ordersStore.unshift(chatOrder);
+          await saveOrderToFirestore(chatOrder);
+        } catch (err) {
+          console.error('Failed to parse CREATE_ORDER json:', err);
+        }
+      }
+
+      const cleanText = responseText
+        .replace(/\[RECOMMEND:\s*([a-zA-Z0-9_-]+)\]/g, '')
+        .replace(/\[CREATE_ORDER:\s*(\{.*?\})\]/gs, '')
+        .replace(/\[FORWARD_HELP:\s*(\{.*?\})\]/gs, '')
+        .replace(/\*\*/g, '')
+        .trim();
+
+      return res.json({
+        text: cleanText,
+        recommendedProductId,
+        orderPayload,
+        helpForwarded,
+      });
+    } catch (error: any) {
+      console.error('Gemini Chat Error:', error);
+      return res.status(500).json({
+        error: 'Failed to process AI chat response',
+        details: error?.message || String(error),
+      });
+    }
+  });
+
+  // 2. Order Submission & Telegram Bot Integration Endpoint
+  app.post('/api/order', async (req, res) => {
+    try {
+      const {
+        items,
+        subtotalUSD,
+        subtotalSSP,
+        bundleDiscountUSD,
+        bundleDiscountSSP,
+        totalUSD,
+        totalSSP,
+        currency,
+        customerName,
+        customerPhone,
+        customerEmail,
+        deliveryCity,
+        deliveryAddress,
+        paymentMethod,
+        notes,
+      } = req.body;
+
+      if (!items || !items.length || !customerName || !customerPhone || !deliveryAddress) {
+        return res.status(400).json({ error: 'Missing required order fields' });
+      }
+
+      const orderId = `JFH-${Math.floor(100000 + Math.random() * 900000)}`;
+      const newOrder: Order = {
+        id: orderId,
+        items,
+        subtotalUSD,
+        subtotalSSP,
+        bundleDiscountUSD: bundleDiscountUSD || 0,
+        bundleDiscountSSP: bundleDiscountSSP || 0,
+        totalUSD,
+        totalSSP,
+        currency: currency || 'SSP',
+        customerName,
+        customerPhone,
+        customerEmail: customerEmail || '',
+        deliveryCity: deliveryCity || 'Juba',
+        deliveryAddress,
+        notes: notes || '',
+        paymentMethod,
+        paymentStatus: 'pending',
+        createdAt: new Date().toISOString(),
+        telegramNotified: false,
+      };
+
+      let telegramNotified = false;
+      let telegramError = undefined;
+
+      const botToken = process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+      const chatId = process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId;
+      const isTelegramEnabled = currentTelegramConfig.enabled || Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
+
+      if (isTelegramEnabled && botToken && chatId) {
+        try {
+          const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+          const messageText = formatTelegramOrderMessage(newOrder);
+
+          const tgRes = await fetch(telegramUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: messageText,
+              parse_mode: 'HTML',
+            }),
+          });
+
+          const tgData: any = await tgRes.json();
+          if (tgData && tgData.ok) {
+            telegramNotified = true;
+          } else {
+            telegramError = tgData?.description || 'Telegram API returned non-ok status';
+          }
+        } catch (tgErr: any) {
+          telegramError = tgErr?.message || String(tgErr);
+        }
+      }
+
+      newOrder.telegramNotified = telegramNotified;
+      if (telegramError) newOrder.telegramError = telegramError;
+
+      ordersStore.unshift(newOrder);
+      await saveOrderToFirestore(newOrder);
+
+      return res.json({
+        success: true,
+        order: newOrder,
+        message: 'Order placed successfully! Saved to database & delivery team notified.',
+      });
+    } catch (error: any) {
+      console.error('Order Submission Error:', error);
+      return res.status(500).json({ error: 'Failed to process order', details: error.message });
+    }
+  });
+
+  // Telegram Webhook Handler for Incoming Client Messages
+  app.post('/api/telegram/webhook', async (req, res) => {
+    try {
+      const update = req.body;
+      const message = update?.message || update?.edited_message;
+
+      if (message && message.text) {
+        const chatId = message.chat?.id;
+        const incomingText = message.text;
+        const senderName = message.from?.first_name || 'Valued Customer';
+
+        const botToken = process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+
+        // Auto-save Chat ID if not set yet
+        if (chatId && (!currentTelegramConfig.chatId || currentTelegramConfig.chatId === '')) {
+          currentTelegramConfig.chatId = String(chatId);
+        }
+
+        if (botToken && chatId) {
+          const replyText = await getAlexTelegramReply(incomingText, senderName);
+
+          const tgUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+          await fetch(tgUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: replyText,
+            }),
+          });
+        }
+      }
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('Telegram Webhook error:', err);
+      return res.json({ ok: true });
+    }
+  });
+
+  // Setup Webhook helper
+  app.post('/api/telegram/setup-webhook', async (req, res) => {
+    try {
+      const { botToken } = req.body;
+      const tokenToUse = botToken || process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+
+      if (!tokenToUse) {
+        return res.status(400).json({ error: 'Bot token required' });
+      }
+
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const proto = req.headers['x-forwarded-proto'] || 'https';
+      const webhookUrl = `${proto}://${host}/api/telegram/webhook`;
+
+      const tgUrl = `https://api.telegram.org/bot${tokenToUse}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
+      const tgRes = await fetch(tgUrl);
+      const tgData: any = await tgRes.json();
+
+      if (tgData && tgData.ok) {
+        return res.json({ success: true, webhookUrl, message: 'Telegram Webhook registered successfully! Bot will now respond to texts.' });
+      } else {
+        return res.status(400).json({ success: false, error: tgData?.description || 'Webhook registration failed' });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+  });
+
+  // 3. Telegram Test Ping Endpoint
+  app.post('/api/telegram/test', async (req, res) => {
+    try {
+      const { botToken, chatId } = req.body;
+      const tokenToUse = botToken || process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+      const chatIdToUse = chatId || process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId;
+
+      if (!tokenToUse || !chatIdToUse) {
+        return res.status(400).json({ error: 'Telegram Bot Token and Chat ID are required' });
+      }
+
+      const telegramUrl = `https://api.telegram.org/bot${tokenToUse}/sendMessage`;
+      const testMsg = `🌸 <b>Juba Fashion Hub Telegram Bot Connected!</b>\n\nYour 9 Collection order notification system is active.\nTime: ${new Date().toLocaleString()}`;
+
+      const response = await fetch(telegramUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatIdToUse,
+          text: testMsg,
+          parse_mode: 'HTML',
+        }),
+      });
+
+      const data: any = await response.json();
+      if (data && data.ok) {
+        return res.json({ success: true, message: 'Test message sent to Telegram successfully!' });
+      } else {
+        let errorDesc = data?.description || 'Failed to send test message to Telegram';
+        if (errorDesc.includes('chat not found')) {
+          errorDesc = 'Bad Request: chat not found. FIX: Open Telegram, search your Bot, tap START (or send "hello"), then click "Auto-Detect Chat ID" above!';
+        }
+        return res.status(400).json({
+          success: false,
+          error: errorDesc,
+        });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+  });
+
+  // Helper endpoint to auto-detect numeric Chat ID from recent bot updates
+  app.post('/api/telegram/detect-chat-id', async (req, res) => {
+    try {
+      const { botToken } = req.body;
+      const tokenToUse = botToken || process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+
+      if (!tokenToUse) {
+        return res.status(400).json({ error: 'Telegram Bot Token is required' });
+      }
+
+      const response = await fetch(`https://api.telegram.org/bot${tokenToUse}/getUpdates`);
+      const data: any = await response.json();
+
+      if (data && data.ok && Array.isArray(data.result) && data.result.length > 0) {
+        const latestUpdate = data.result[data.result.length - 1];
+        const chat = latestUpdate.message?.chat || latestUpdate.edited_message?.chat || latestUpdate.channel_post?.chat || latestUpdate.my_chat_member?.chat;
+
+        if (chat && chat.id) {
+          const detectedId = String(chat.id);
+          currentTelegramConfig.chatId = detectedId;
+          return res.json({
+            success: true,
+            chatId: detectedId,
+            chatName: chat.first_name || chat.title || 'User',
+            message: `Found Chat ID ${detectedId} (${chat.first_name || chat.title || 'Telegram User'})! Saved automatically.`,
+          });
+        }
+      }
+
+      return res.status(404).json({
+        success: false,
+        error: 'No recent messages found for this bot. Step 1: Open Telegram app, Step 2: Search your Bot name, Step 3: Tap START or send "hello", then click "Auto-Detect Chat ID" again!',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+  });
+
+  // 4. Store & Order Admin Endpoints
+  app.get('/api/kb', (req, res) => res.json(currentKnowledgeBase));
+  app.post('/api/kb', (req, res) => {
+    currentKnowledgeBase = { ...currentKnowledgeBase, ...req.body };
+    return res.json({ success: true, kb: currentKnowledgeBase });
+  });
+
+  app.get('/api/telegram/config', (req, res) => {
+    return res.json({
+      ...currentTelegramConfig,
+      botToken: process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken,
+      chatId: process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId,
+    });
+  });
+  app.post('/api/telegram/config', (req, res) => {
+    currentTelegramConfig = { ...currentTelegramConfig, ...req.body };
+    return res.json({ success: true, config: currentTelegramConfig });
+  });
+
+  // GET Orders from Firestore & memory
+  app.get('/api/orders', async (req, res) => {
+    try {
+      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
+      const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+
+      const orderMap = new Map<string, Order>();
+      firestoreOrders.forEach((o) => orderMap.set(o.id, o));
+      ordersStore.forEach((o) => {
+        if (!orderMap.has(o.id)) orderMap.set(o.id, o);
+      });
+
+      const combinedOrders = Array.from(orderMap.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      return res.json(combinedOrders);
+    } catch (err) {
+      console.error('Error fetching orders from Firestore:', err);
+      return res.json(ordersStore);
+    }
+  });
+
+  // GET Customer Help Requests from Firestore
+  app.get('/api/help-requests', async (req, res) => {
+    try {
+      const q = query(collection(db, 'helpRequests'), orderBy('createdAt', 'desc'), limit(50));
+      const snapshot = await getDocs(q);
+      const requests = snapshot.docs.map((d) => d.data());
+      return res.json(requests);
+    } catch (err) {
+      console.error('Error fetching help requests from Firestore:', err);
+      return res.json([]);
+    }
+  });
+
+  // POST Resend Telegram notification for an order
+  app.post('/api/orders/:id/resend-telegram', async (req, res) => {
+    try {
+      const { id } = req.params;
+      let targetOrder = ordersStore.find((o) => o.id === id);
+
+      if (!targetOrder) {
+        const q = query(collection(db, 'orders'), limit(100));
+        const snapshot = await getDocs(q);
+        const orders = snapshot.docs.map((d) => d.data() as Order);
+        targetOrder = orders.find((o) => o.id === id);
+      }
+
+      if (!targetOrder) {
+        return res.status(404).json({ error: 'Order not found in database' });
+      }
+
+      const botToken = process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+      const chatId = process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId;
+
+      if (!botToken || !chatId) {
+        return res.status(400).json({ error: 'Telegram Bot Token or Chat ID is missing' });
+      }
+
+      const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      const messageText = formatTelegramOrderMessage(targetOrder);
+
+      const tgRes = await fetch(telegramUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: messageText,
+          parse_mode: 'HTML',
+        }),
+      });
+
+      const tgData: any = await tgRes.json();
+      if (tgData && tgData.ok) {
+        targetOrder.telegramNotified = true;
+        delete targetOrder.telegramError;
+        await saveOrderToFirestore(targetOrder);
+        return res.json({ success: true, message: 'Order details resent to Telegram bot successfully!' });
+      } else {
+        let errorMsg = tgData?.description || 'Telegram API returned error';
+        if (errorMsg.includes('chat not found')) {
+          errorMsg = 'Bad Request: chat not found. (Fix: Search your bot in Telegram, tap START, then click "Detect Chat ID" in Admin Bot Config)';
+        }
+        targetOrder.telegramError = errorMsg;
+        await saveOrderToFirestore(targetOrder);
+        return res.status(400).json({ success: false, error: errorMsg });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+  });
+
+  return app;
+}
+
+// Long-polling engine for local/traditional hosting only.
+// Not used on Vercel — the serverless entry relies on the /api/telegram/webhook route instead.
+export function startTelegramPolling() {
+  let lastUpdateId = 0;
+
+  console.log('🤖 Telegram Long Polling Engine started...');
+
+  const pollLoop = async () => {
+    try {
+      const tokenToUse = process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
+
+      if (tokenToUse) {
+        const url = `https://api.telegram.org/bot${tokenToUse}/getUpdates?offset=${lastUpdateId + 1}&timeout=10`;
+        const response = await fetch(url);
+        const data: any = await response.json();
+
+        if (data && data.ok && Array.isArray(data.result)) {
+          for (const update of data.result) {
+            lastUpdateId = Math.max(lastUpdateId, update.update_id);
+            const message = update.message || update.edited_message;
+
+            if (message && message.text) {
+              const chatId = message.chat?.id;
+              const incomingText = message.text;
+              const senderName = message.from?.first_name || 'Customer';
+
+              if (chatId && (!currentTelegramConfig.chatId || currentTelegramConfig.chatId === '')) {
+                currentTelegramConfig.chatId = String(chatId);
+                console.log(`Auto-saved Chat ID: ${chatId}`);
+              }
+
+              if (chatId) {
+                const replyText = await getAlexTelegramReply(incomingText, senderName);
+
+                await fetch(`https://api.telegram.org/bot${tokenToUse}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    text: replyText,
+                  }),
+                });
+              }
+            }
+          }
+        } else if (data && data.error_code === 409) {
+          // Webhook is blocking getUpdates -> delete webhook so polling works
+          await fetch(`https://api.telegram.org/bot${tokenToUse}/deleteWebhook`);
+        }
+      }
+    } catch (err) {
+      // Silent catch for network hiccups during polling
+    } finally {
+      setTimeout(pollLoop, 2000);
+    }
+  };
+
+  pollLoop();
+}
