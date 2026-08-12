@@ -50,7 +50,7 @@ export const PERFUMES_DATA: PerfumeProduct[] = [
     originalPriceSSP: 400000,
     rating: 5.0,
     reviewsCount: 142,
-    image: '/images/9pm_elixir.png',
+    image: '/images/9pm_elixir.jpg',
     stockCount: 5,
     isBestSeller: true,
     badge: '⚡ NEW LUXURY ELIXIR - LIMITED STOCK',
