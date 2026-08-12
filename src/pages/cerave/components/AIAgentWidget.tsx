@@ -21,10 +21,10 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
     {
       id: 'msg-welcome',
       sender: 'agent',
-      text: 'Jambo handsome... Welcome to Juba Fashion Hub! I\'m Amina, your personal fragrance partner. What kind of scent are you looking for today — a fresh daytime vibe or an alluring night perfume?',
+      text: 'Jambo! Welcome to Juba Fashion Hub! I\'m Amina, your personal skincare partner. What is your skin dealing with today — acne, dryness, or just want a full CeraVe routine?',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       quickActions: [
-        { label: '🔥 Best Night Perfume', action: 'Amina darling, which fragrance is guaranteed to make heads turn at night?' },
+        { label: '🔥 Best for Acne', action: 'Amina, which CeraVe product is best for clearing acne and breakouts?' },
         { label: '🛍️ Order Directly in Chat', action: 'I want to place an order directly with you right now!' },
         { label: '🚚 Delivery Rules in Juba', action: 'What are your delivery time and payment rules in Juba?' },
       ],
@@ -62,6 +62,7 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
           message: query,
           chatHistory: messages,
           selectedCurrency: currency,
+          storeSlug: 'cerave',
         }),
       });
 
@@ -87,7 +88,7 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
         {
           id: `err-${Date.now()}`,
           sender: 'agent',
-          text: 'I apologize, I experienced a brief connection hiccup. You can explore all our fragrances in the catalog above or call support directly at +211 911 267 703!',
+          text: 'I apologize, I experienced a brief connection hiccup. You can explore all our skincare products in the catalog above or call support directly at +211 911 267 703!',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -121,12 +122,12 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
             </div>
             <div>
               <span className="text-[11px] sm:text-xs font-bold text-white block">Amina • Juba Fashion Hub</span>
-              <span className="text-[9px] sm:text-[10px] text-purple-400 font-semibold block">AI Fragrance Partner</span>
+              <span className="text-[9px] sm:text-[10px] text-purple-400 font-semibold block">AI Skincare Partner</span>
             </div>
           </div>
 
           <p className="text-[11px] sm:text-xs text-gray-300 leading-snug">
-            Jambo darling... Tell me, what fragrance vibe are you looking for today?
+            Jambo! Tell me, what does your skin need help with today?
           </p>
 
           <button
@@ -178,7 +179,7 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
                 <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900"></span>
               </div>
               <div>
-                <h3 className="text-xs font-bold text-white">Amina • AI Fragrance Partner</h3>
+                <h3 className="text-xs font-bold text-white">Amina • AI Skincare Partner</h3>
                 <span className="text-[9px] text-emerald-400 flex items-center gap-1 font-semibold">
                   Online in Juba
                 </span>
@@ -285,7 +286,7 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
           >
             <input
               type="text"
-              placeholder="Ask Amina about fragrances..."
+              placeholder="Ask Amina about skincare..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               className="flex-1 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200 text-xs text-slate-900 focus:outline-none focus:border-[#B24BF3] focus:bg-white"
