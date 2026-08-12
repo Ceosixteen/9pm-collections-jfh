@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ShoppingBag, Diamond } from 'lucide-react';
 import { Currency } from '../types';
 
@@ -43,16 +44,16 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Main Header Bar - Optimized for Mobile */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-3 flex items-center justify-between gap-2">
         
-        {/* Left: Juba Fashion Hub Logo */}
+        {/* Left: Juba Fashion Hub Logo (links back to all collections) */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <img
               src="/images/juba_fashion_hub_logo.jpg"
               alt="Juba Fashion Hub Online Store"
               className="h-9 sm:h-12 w-auto object-contain rounded-md hover:scale-105 transition-transform"
               referrerPolicy="no-referrer"
             />
-          </div>
+          </Link>
         </div>
 
         {/* Right: USD/SSP Toggle, Ask Amina AI & Cart Button */}
