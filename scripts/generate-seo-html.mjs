@@ -43,6 +43,7 @@ const PAGES = [
         itemListElement: [
           { '@type': 'OfferCatalog', name: 'The 9 Collection', url: `${SITE_URL}/collections/9pm` },
           { '@type': 'OfferCatalog', name: 'Rasasi Hawas Collection', url: `${SITE_URL}/collections/hawas` },
+          { '@type': 'OfferCatalog', name: "Bade'e Al Oud Collection", url: `${SITE_URL}/collections/badee-al-oud` },
           { '@type': 'OfferCatalog', name: 'CeraVe Skincare Collection', url: `${SITE_URL}/collections/cerave` },
         ],
       },
@@ -108,6 +109,27 @@ const PAGES = [
         { '@type': 'Product', position: 3, name: 'CeraVe Renewing SA Cleanser', image: `${SITE_URL}/images/cerave_renewing_sa_cleanser.jpg`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '25' } },
         { '@type': 'Product', position: 4, name: 'CeraVe Hydrating Cleanser', image: `${SITE_URL}/images/cerave_hydrating_cleanser.jpg`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '25' } },
         { '@type': 'Product', position: 5, name: 'CeraVe Resurfacing Retinol Serum', image: `${SITE_URL}/images/cerave_retinol_serum.jpg`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '20' } },
+      ],
+    },
+  },
+  {
+    route: '/collections/badee-al-oud',
+    outFile: 'collections/badee-al-oud/index.html',
+    title: "Bade'e Al Oud Collection by Lattafa | Juba Fashion Hub",
+    description:
+      "Shop the Lattafa Bade'e Al Oud Collection — Black, Amethyst, Sublime, Noble Blush & White. 100% authentic 100ml EDP, free express delivery across Juba.",
+    image: '/images/oud_black.png',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: "Bade'e Al Oud Collection",
+      url: `${SITE_URL}/collections/badee-al-oud`,
+      itemListElement: [
+        { '@type': 'Product', position: 1, name: "Bade'e Al Oud Black", image: `${SITE_URL}/images/oud_black.png`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '40' } },
+        { '@type': 'Product', position: 2, name: "Bade'e Al Oud Amethyst", image: `${SITE_URL}/images/oud_amethyst.png`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '40' } },
+        { '@type': 'Product', position: 3, name: "Bade'e Al Oud Sublime", image: `${SITE_URL}/images/oud_sublime.png`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '40' } },
+        { '@type': 'Product', position: 4, name: "Bade'e Al Oud Noble Blush", image: `${SITE_URL}/images/oud_noble_blush.png`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '40' } },
+        { '@type': 'Product', position: 5, name: "Bade'e Al Oud White", image: `${SITE_URL}/images/oud_white.png`, offers: { '@type': 'Offer', priceCurrency: 'USD', price: '40' } },
       ],
     },
   },

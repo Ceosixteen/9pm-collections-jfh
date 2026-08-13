@@ -22,8 +22,8 @@ export const Hero: React.FC = () => {
 
         <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto mb-8 leading-relaxed">
           Authentic fragrances and dermatologist-developed skincare, delivered fast across Juba.
-          Explore The 9 Collection, Rasasi Hawas, and CeraVe Skincare — each with its own
-          curated storefront and AI shopping assistant.
+          Explore The 9 Collection, Rasasi Hawas, Bade'e Al Oud, and CeraVe Skincare — each with
+          its own curated storefront and AI shopping assistant.
         </p>
 
         <button

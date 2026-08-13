@@ -6,6 +6,7 @@ import { db, setDoc, doc, collection, getDocs, query, orderBy, limit } from '../
 import * as nineCollectionCatalog from './catalogs/nineCollection.js';
 import * as hawasCatalog from './catalogs/hawas.js';
 import * as ceraveCatalog from './catalogs/cerave.js';
+import * as badeeAlOudCatalog from './catalogs/badeeAlOud.js';
 
 interface Catalog {
   label: string;
@@ -18,6 +19,7 @@ const CATALOGS: Record<string, Catalog> = {
   'nine-collection': nineCollectionCatalog,
   hawas: hawasCatalog,
   cerave: ceraveCatalog,
+  'badee-al-oud': badeeAlOudCatalog,
 };
 
 function resolveCatalog(storeSlug?: string): Catalog {
@@ -98,7 +100,7 @@ function generateAlexFallbackResponse(
   }
 
   if (q.includes('price') || q.includes('stock') || q.includes('inventory') || q.includes('perfume')) {
-    return `📦 Juba Fashion Hub - Stock & Prices\n\nThe 9 Collection (Afnan, 100ml EDP):\n• 9PM Rebel: $40 / 320,000 SSP\n• 9PM Elixir: $40 / 320,000 SSP\n• 9PM Black Classic: $35 / 280,000 SSP\n• 9AM Dive: $40 / 320,000 SSP\n• 9PM Pour Femme: $35 / 280,000 SSP\n\nRasasi Hawas Collection (100ml EDP):\n• Hawas for Him: $35 / 280,000 SSP\n• Hawas Ice: $35 / 280,000 SSP\n• Hawas Black: $35 / 280,000 SSP\n• Hawas Fire: $35 / 280,000 SSP\n• Hawas Pink: $35 / 280,000 SSP\n\nCeraVe Skincare Collection:\n• Foaming Cleanser: $25 / 200,000 SSP\n• Acne Control Cleanser: $25 / 200,000 SSP\n• Renewing SA Cleanser: $25 / 200,000 SSP\n• Hydrating Cleanser: $25 / 200,000 SSP\n• Hydrating Toner: $25 / 200,000 SSP\n• Moisturizing Lotion: $25 / 200,000 SSP\n• Resurfacing Retinol Serum: $20 / 160,000 SSP\n• Moisturizing Cream: $30 / 240,000 SSP\n\nAll authentic imports.`;
+    return `📦 Juba Fashion Hub - Stock & Prices\n\nThe 9 Collection (Afnan, 100ml EDP):\n• 9PM Rebel: $40 / 320,000 SSP\n• 9PM Elixir: $40 / 320,000 SSP\n• 9PM Black Classic: $35 / 280,000 SSP\n• 9AM Dive: $40 / 320,000 SSP\n• 9PM Pour Femme: $35 / 280,000 SSP\n\nRasasi Hawas Collection (100ml EDP):\n• Hawas for Him: $35 / 280,000 SSP\n• Hawas Ice: $35 / 280,000 SSP\n• Hawas Black: $35 / 280,000 SSP\n• Hawas Fire: $35 / 280,000 SSP\n• Hawas Pink: $35 / 280,000 SSP\n\nBade'e Al Oud Collection (Lattafa, 100ml EDP):\n• Oud Black: $40 / 320,000 SSP\n• Oud Amethyst: $40 / 320,000 SSP\n• Oud Sublime: $40 / 320,000 SSP\n• Oud Noble Blush: $40 / 320,000 SSP\n• Oud White: $40 / 320,000 SSP\n\nCeraVe Skincare Collection:\n• Foaming Cleanser: $25 / 200,000 SSP\n• Acne Control Cleanser: $25 / 200,000 SSP\n• Renewing SA Cleanser: $25 / 200,000 SSP\n• Hydrating Cleanser: $25 / 200,000 SSP\n• Hydrating Toner: $25 / 200,000 SSP\n• Moisturizing Lotion: $25 / 200,000 SSP\n• Resurfacing Retinol Serum: $20 / 160,000 SSP\n• Moisturizing Cream: $30 / 240,000 SSP\n\nAll authentic imports.`;
   }
 
   return `👨‍💼 Alex - Admin Operations Assistant\n\nHello Admin! I am Alex, your backend store operations assistant for Juba Fashion Hub.\n\nI can assist you with:\n• Orders & Sales (ask "show orders")\n• Revenue Stats (ask "total revenue")\n• Customer Enquiries (ask "customer queries")\n• Inventory & Pricing (ask "stock and prices")`;
@@ -167,6 +169,13 @@ Rasasi Hawas Collection (100ml EDP):
 3. Hawas Black ($35 / 280,000 SSP)
 4. Hawas Fire ($35 / 280,000 SSP)
 5. Hawas Pink ($35 / 280,000 SSP)
+
+Bade'e Al Oud Collection (Lattafa, 100ml EDP):
+1. Oud Black ($40 / 320,000 SSP)
+2. Oud Amethyst ($40 / 320,000 SSP)
+3. Oud Sublime ($40 / 320,000 SSP)
+4. Oud Noble Blush ($40 / 320,000 SSP)
+5. Oud White ($40 / 320,000 SSP)
 
 CeraVe Skincare Collection:
 1. Foaming Facial Cleanser ($25 / 200,000 SSP)

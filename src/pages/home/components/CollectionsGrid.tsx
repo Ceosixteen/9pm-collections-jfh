@@ -32,6 +32,13 @@ const COLLECTIONS: CollectionCard[] = [
     image: '/images/cerave_foaming_cleanser.jpg',
     badge: 'Skincare',
   },
+  {
+    to: '/collections/badee-al-oud',
+    name: "Bade'e Al Oud Collection",
+    subtitle: 'Lattafa Black, Amethyst, Sublime, Noble Blush & White',
+    image: '/images/oud_black.png',
+    badge: 'Fragrances',
+  },
 ];
 
 export const CollectionsGrid: React.FC = () => {
@@ -48,7 +55,7 @@ export const CollectionsGrid: React.FC = () => {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
           {COLLECTIONS.map((c) => (
             <Link
               key={c.to}

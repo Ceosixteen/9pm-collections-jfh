@@ -6,6 +6,7 @@ export const Header: React.FC = () => {
     { to: '/collections/9pm', label: 'The 9 Collection' },
     { to: '/collections/hawas', label: 'Rasasi Hawas' },
     { to: '/collections/cerave', label: 'CeraVe Skincare' },
+    { to: '/collections/badee-al-oud', label: "Bade'e Al Oud" },
   ];
 
   return (

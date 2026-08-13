@@ -1,12 +1,13 @@
 import React from 'react';
+import { PhoneCall } from 'lucide-react';
 
 export const MarqueeBanner: React.FC = () => {
   const items = [
-    'Free delivery within Juba Town',
-    'Pay on delivery (Cash) or Paystack (Card)',
-    '100% Authentic Afnan, Rasasi, Lattafa & CeraVe Imports',
-    'Same-Day Dispatch across Munuki, Tongping, Gudele & Hai Cinema',
-    'WhatsApp / Call Support: +211 911 267 703',
+    "Free delivery within Juba Town",
+    "Pay on delivery (Cash) or Paystack (Card)",
+    "100% Authentic Lattafa & Designer Fragrances",
+    "Same-Day Dispatch across Munuki, Tongping, Gudele & Hai Cinema",
+    "WhatsApp / Call Support: +211 911 267 703",
   ];
 
   return (
