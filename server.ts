@@ -1,4 +1,5 @@
 import path from 'path';
+import { existsSync } from 'fs';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { createApp, startTelegramPolling } from './api/_lib/app.js';
@@ -18,6 +19,13 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
+      // Prefer a pre-rendered index.html for this exact route (baked-in SEO/
+      // Open Graph tags per page) when one exists, matching how Vercel's
+      // static file resolution serves dist/<route>/index.html directly.
+      const routedIndex = path.join(distPath, req.path.replace(/\/$/, ''), 'index.html');
+      if (req.path !== '/' && existsSync(routedIndex)) {
+        return res.sendFile(routedIndex);
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
