@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, '..', 'dist');
-const SITE_URL = 'https://9pm-collections-jfh.vercel.app';
+const SITE_URL = 'https://jubafashionhub.link';
 
 const PAGES = [
   {

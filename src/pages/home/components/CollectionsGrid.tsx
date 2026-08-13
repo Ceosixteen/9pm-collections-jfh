@@ -55,12 +55,12 @@ export const CollectionsGrid: React.FC = () => {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
           {COLLECTIONS.map((c) => (
             <Link
               key={c.to}
               to={c.to}
-              className="group relative rounded-3xl overflow-hidden bg-white border border-purple-100 shadow-sm hover:shadow-xl transition-all"
+              className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white border border-purple-100 shadow-sm hover:shadow-xl transition-all"
             >
               <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
                 <img
@@ -70,16 +70,16 @@ export const CollectionsGrid: React.FC = () => {
                 />
               </div>
 
-              <div className="absolute top-4 left-4 px-2.5 py-1 rounded-full bg-white/90 text-[#B24BF3] text-[10px] font-bold uppercase tracking-wider shadow-xs">
+              <div className="absolute top-1.5 left-1.5 sm:top-4 sm:left-4 px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-white/90 text-[#B24BF3] text-[8px] sm:text-[10px] font-bold uppercase tracking-wider shadow-xs">
                 {c.badge}
               </div>
 
-              <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white">
-                <h3 className="text-lg font-black mb-1">{c.name}</h3>
-                <p className="text-xs text-white/85 mb-3 leading-relaxed">{c.subtitle}</p>
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-white group-hover:gap-2 transition-all">
+              <div className="absolute inset-x-0 bottom-0 p-2.5 sm:p-5 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white">
+                <h3 className="text-xs sm:text-lg font-black mb-0.5 sm:mb-1 line-clamp-2">{c.name}</h3>
+                <p className="hidden sm:block text-xs text-white/85 mb-3 leading-relaxed">{c.subtitle}</p>
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold text-white group-hover:gap-2 transition-all">
                   Shop Now
-                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <ArrowUpRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </span>
               </div>
             </Link>

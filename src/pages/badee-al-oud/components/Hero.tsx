@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Flame, ShoppingBag, PhoneCall, ArrowRight, Truck, Gift, ShieldCheck, Sparkles, Clock } from 'lucide-react';
+import { Flame, ShoppingBag, PhoneCall, ArrowRight, Truck, Gift, ShieldCheck, Sparkles, Clock, ChevronDown } from 'lucide-react';
 import { Currency, PerfumeProduct } from '../types';
 
 interface HeroProps {
@@ -242,6 +242,16 @@ export const Hero: React.FC<HeroProps> = ({
           </div>
 
         </div>
+
+        {/* Scroll Down Indicator */}
+        <button
+          onClick={onExploreProducts}
+          aria-label="Scroll to products, bundles and reviews"
+          className="flex flex-col items-center gap-1 mx-auto mt-6 sm:mt-10 text-[#B24BF3] hover:text-[#9f35e3] transition-colors cursor-pointer"
+        >
+          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">See Products, Bundles &amp; Reviews</span>
+          <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 animate-bounce" />
+        </button>
       </div>
 
     </section>

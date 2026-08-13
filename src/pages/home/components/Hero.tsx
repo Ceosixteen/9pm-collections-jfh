@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Truck, Gift, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, Truck, Gift, ShieldCheck, Sparkles, ChevronDown } from 'lucide-react';
 
 export const Hero: React.FC = () => {
   const scrollToCollections = () => {
@@ -48,6 +48,16 @@ export const Hero: React.FC = () => {
             <span>100% Authentic Imports</span>
           </div>
         </div>
+
+        {/* Scroll Down Indicator */}
+        <button
+          onClick={scrollToCollections}
+          aria-label="Scroll to collections, products and reviews"
+          className="flex flex-col items-center gap-1 mx-auto mt-10 text-[#B24BF3] hover:text-[#9f35e3] transition-colors cursor-pointer"
+        >
+          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">See Collections &amp; Reviews</span>
+          <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 animate-bounce" />
+        </button>
 
       </div>
     </section>
