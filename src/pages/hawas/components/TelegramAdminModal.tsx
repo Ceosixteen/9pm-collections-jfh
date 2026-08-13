@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Bot, Database, Phone, RefreshCw, CheckCircle2, AlertCircle, MessageSquare } from 'lucide-react';
+import { X, Send, Bot, Database, Phone, RefreshCw, CheckCircle2, AlertCircle, MessageSquare, Users, Crown } from 'lucide-react';
 import { TelegramConfig, Order } from '../types';
+
+interface ClientRecord {
+  phone: string;
+  name: string;
+  email: string;
+  city: string;
+  stores: string[];
+  totalSpentUSD: number;
+  totalSpentSSP: number;
+  ordersCount: number;
+  lastOrderDate: string;
+  lastOrderId: string;
+  status: 'VIP Buyer' | 'Active Customer';
+}
 
 interface TelegramAdminModalProps {
   isOpen: boolean;
@@ -15,7 +29,7 @@ export const TelegramAdminModal: React.FC<TelegramAdminModalProps> = ({
   config,
   onUpdateConfig,
 }) => {
-  const [activeTab, setActiveTab] = useState<'config' | 'orders' | 'help'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'orders' | 'help' | 'clients'>('config');
   const [botToken, setBotToken] = useState(config.botToken);
   const [chatId, setChatId] = useState(config.chatId);
   const [enabled, setEnabled] = useState(config.enabled);
@@ -25,7 +39,9 @@ export const TelegramAdminModal: React.FC<TelegramAdminModalProps> = ({
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
+  const [clients, setClients] = useState<ClientRecord[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingClients, setLoadingClients] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +51,7 @@ export const TelegramAdminModal: React.FC<TelegramAdminModalProps> = ({
       setEnabled(config.enabled);
       fetchOrders();
       fetchHelpRequests();
+      fetchClients();
     }
   }, [isOpen, config]);
 
@@ -62,6 +79,21 @@ export const TelegramAdminModal: React.FC<TelegramAdminModalProps> = ({
       }
     } catch (err) {
       console.error('Failed to fetch help requests:', err);
+    }
+  };
+
+  const fetchClients = async () => {
+    setLoadingClients(true);
+    try {
+      const res = await fetch('/api/clients');
+      if (res.ok) {
+        const data = await res.json();
+        setClients(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch client records:', err);
+    } finally {
+      setLoadingClients(false);
     }
   };
 
@@ -231,6 +263,21 @@ export const TelegramAdminModal: React.FC<TelegramAdminModalProps> = ({
           >
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Customer Queries ({helpRequests.length})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('clients');
+              fetchClients();
+            }}
+            className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'clients'
+                ? 'bg-[#E24E82] text-white shadow-md'
+                : 'bg-[#2B1A3E] text-[#DBCDEB] hover:text-white'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Clients ({clients.length})</span>
           </button>
         </div>
 
@@ -468,6 +515,83 @@ export const TelegramAdminModal: React.FC<TelegramAdminModalProps> = ({
                       <p className="text-white bg-[#1A1026] p-2.5 rounded-xl border border-purple-900/40">
                         "{req.customerQuery}"
                       </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* CLIENTS TAB */}
+          {activeTab === 'clients' && (
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between text-xs text-gray-400">
+                <span>Client records aggregated from orders across all stores</span>
+                <button
+                  onClick={fetchClients}
+                  className="flex items-center gap-1 text-[#E24E82] hover:underline cursor-pointer font-semibold"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingClients ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+
+              {clients.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-xs">
+                  No client records yet. They're built automatically from placed orders.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {clients.map((client) => (
+                    <div
+                      key={client.phone}
+                      className="p-3.5 rounded-2xl bg-[#2B1A3E]/60 border border-[#A584C8]/20 space-y-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between font-bold text-white">
+                        <span className="text-white">{client.name}</span>
+                        {client.status === 'VIP Buyer' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300 border border-amber-500/30 text-[10px]">
+                            <Crown className="w-3 h-3" /> VIP Buyer
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#3A2352] text-[#DBCDEB] border border-[#A584C8]/30 text-[10px]">
+                            Active Customer
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[#DBCDEB]">
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">Phone Number:</span>
+                          <a href={`tel:${client.phone}`} className="text-purple-300 font-semibold hover:underline flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> {client.phone}
+                          </a>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block text-[10px]">City:</span>
+                          <strong className="text-white">{client.city}</strong>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-gray-400 block text-[10px]">Ordered From:</span>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {client.stores.map((s) => (
+                            <span key={s} className="px-2 py-0.5 rounded-full bg-purple-900/50 text-purple-200 border border-purple-500/30 text-[10px] capitalize">
+                              {s.replace('-', ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-1 border-t border-[#A584C8]/20 flex items-center justify-between text-[11px]">
+                        <span className="text-gray-300">
+                          {client.ordersCount} order{client.ordersCount === 1 ? '' : 's'} · Last: {new Date(client.lastOrderDate).toLocaleDateString()}
+                        </span>
+                        <strong className="text-emerald-400 font-bold">
+                          ${client.totalSpentUSD.toLocaleString()} total
+                        </strong>
+                      </div>
                     </div>
                   ))}
                 </div>

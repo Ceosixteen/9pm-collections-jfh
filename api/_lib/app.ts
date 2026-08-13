@@ -381,6 +381,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
 
           const chatOrder: Order = {
             id: orderId,
+            storeSlug: storeSlug || 'nine-collection',
             items: itemsList,
             subtotalUSD,
             subtotalSSP,
@@ -479,6 +480,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         deliveryAddress,
         paymentMethod,
         notes,
+        storeSlug,
       } = req.body;
 
       if (!items || !items.length || !customerName || !customerPhone || !deliveryAddress) {
@@ -488,6 +490,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       const orderId = `JFH-${Math.floor(100000 + Math.random() * 900000)}`;
       const newOrder: Order = {
         id: orderId,
+        storeSlug: storeSlug || 'nine-collection',
         items,
         subtotalUSD,
         subtotalSSP,
@@ -744,6 +747,97 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (err) {
       console.error('Error fetching orders from Firestore:', err);
       return res.json(ordersStore);
+    }
+  });
+
+  // GET Client Records — derived from orders, grouped by phone number, across all
+  // three storefronts (nine-collection, hawas, cerave) since they share this backend.
+  app.get('/api/clients', async (req, res) => {
+    try {
+      let allOrders: Order[] = [];
+      try {
+        const q = query(collection(db, 'orders'), limit(500));
+        const snapshot = await getDocs(q);
+        const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+        const orderMap = new Map<string, Order>();
+        firestoreOrders.forEach((o) => orderMap.set(o.id, o));
+        ordersStore.forEach((o) => {
+          if (!orderMap.has(o.id)) orderMap.set(o.id, o);
+        });
+        allOrders = Array.from(orderMap.values());
+      } catch (err) {
+        console.error('Error fetching orders for client aggregation:', err);
+        allOrders = ordersStore;
+      }
+
+      const VIP_THRESHOLD_USD = 100;
+      const clientMap = new Map<string, {
+        phone: string;
+        name: string;
+        email: string;
+        city: string;
+        stores: Set<string>;
+        totalSpentUSD: number;
+        totalSpentSSP: number;
+        ordersCount: number;
+        lastOrderDate: string;
+        lastOrderId: string;
+      }>();
+
+      for (const order of allOrders) {
+        const phoneKey = (order.customerPhone || 'unknown').trim();
+        const existing = clientMap.get(phoneKey);
+        const orderStore = order.storeSlug || 'nine-collection';
+
+        if (existing) {
+          existing.totalSpentUSD += order.totalUSD || 0;
+          existing.totalSpentSSP += order.totalSSP || 0;
+          existing.ordersCount += 1;
+          existing.stores.add(orderStore);
+          if (new Date(order.createdAt).getTime() > new Date(existing.lastOrderDate).getTime()) {
+            existing.lastOrderDate = order.createdAt;
+            existing.lastOrderId = order.id;
+            // Keep the most recently used name/email/city for this client
+            existing.name = order.customerName || existing.name;
+            existing.email = order.customerEmail || existing.email;
+            existing.city = order.deliveryCity || existing.city;
+          }
+        } else {
+          clientMap.set(phoneKey, {
+            phone: phoneKey,
+            name: order.customerName || 'Unknown Customer',
+            email: order.customerEmail || '',
+            city: order.deliveryCity || 'Juba',
+            stores: new Set([orderStore]),
+            totalSpentUSD: order.totalUSD || 0,
+            totalSpentSSP: order.totalSSP || 0,
+            ordersCount: 1,
+            lastOrderDate: order.createdAt,
+            lastOrderId: order.id,
+          });
+        }
+      }
+
+      const clients = Array.from(clientMap.values())
+        .map((c) => ({
+          phone: c.phone,
+          name: c.name,
+          email: c.email,
+          city: c.city,
+          stores: Array.from(c.stores),
+          totalSpentUSD: c.totalSpentUSD,
+          totalSpentSSP: c.totalSpentSSP,
+          ordersCount: c.ordersCount,
+          lastOrderDate: c.lastOrderDate,
+          lastOrderId: c.lastOrderId,
+          status: c.totalSpentUSD >= VIP_THRESHOLD_USD ? 'VIP Buyer' : 'Active Customer',
+        }))
+        .sort((a, b) => b.totalSpentUSD - a.totalSpentUSD);
+
+      return res.json(clients);
+    } catch (err: any) {
+      console.error('Error building client records:', err);
+      return res.status(500).json({ error: 'Failed to build client records', details: err?.message });
     }
   });
 

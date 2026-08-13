@@ -80,6 +80,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     try {
       const payload = {
+        storeSlug: 'nine-collection',
         items: items.map((it) => ({
           productId: it.product.id,
           productName: it.product.name,

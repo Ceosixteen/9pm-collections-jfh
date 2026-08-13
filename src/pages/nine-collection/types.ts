@@ -61,6 +61,7 @@ export type PaymentMethod = 'm-gurush' | 'bank_transfer' | 'cod';
 
 export interface Order {
   id: string;
+  storeSlug?: string;
   items: {
     productId: string;
     productName: string;
