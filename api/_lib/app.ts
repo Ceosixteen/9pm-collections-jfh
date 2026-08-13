@@ -71,6 +71,26 @@ async function callGroq(
   return text;
 }
 
+// Best-effort fallback for when the model names a product in its reply
+// without the [RECOMMEND: id] tag. Matches on the product's core name
+// (stripped of " by Brand" suffixes), longest name first so more specific
+// products (e.g. "9PM Black Classic") win over shorter overlapping ones
+// (e.g. "9PM Black").
+function inferRecommendedProductId(
+  text: string,
+  perfumes: readonly { id: string; name: string }[]
+): string | undefined {
+  const lowerText = text.toLowerCase();
+  const sorted = [...perfumes].sort((a, b) => b.name.length - a.name.length);
+  for (const p of sorted) {
+    const core = p.name.split(/ by /i)[0].replace(/[()]/g, '').trim().toLowerCase();
+    if (core && lowerText.includes(core)) {
+      return p.id;
+    }
+  }
+  return undefined;
+}
+
 // Firestore Persistence Helpers
 async function saveOrderToFirestore(order: Order) {
   try {
@@ -318,6 +338,12 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       const recommendMatch = responseText.match(/\[RECOMMEND:\s*([a-zA-Z0-9_-]+)\]/);
       if (recommendMatch && recommendMatch[1]) {
         recommendedProductId = recommendMatch[1];
+      } else {
+        // Groq/Llama doesn't reliably append the [RECOMMEND: id] tag the way
+        // Gemini did, even when it clearly names a product in the reply.
+        // Fall back to matching a known product name in the response text so
+        // the "Add to Cart" card still shows up.
+        recommendedProductId = inferRecommendedProductId(responseText, catalog.perfumesData);
       }
 
       // Handle Help Forwarding to Telegram
