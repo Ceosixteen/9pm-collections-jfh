@@ -10,6 +10,7 @@ import { DeliverySteps } from './components/DeliverySteps';
 import { ReviewsSection } from './components/ReviewsSection';
 import { CartDrawer } from './components/CartDrawer';
 import { AIAgentWidget } from './components/AIAgentWidget';
+import { RecentOrdersToast } from './components/RecentOrdersToast';
 import { StickyBuyBar } from './components/StickyBuyBar';
 import { Footer } from './components/Footer';
 import { TelegramAdminModal } from './components/TelegramAdminModal';
@@ -222,12 +223,15 @@ export default function App() {
         onOpenKnowledgeBaseAdmin={() => setIsKbAdminOpen(true)}
       />
 
-      {/* AI Sales Agent Widget */}
+      {/* Sales Team Chat Widget */}
       <AIAgentWidget
         currency={currency}
         perfumes={perfumes}
         onAddToCart={handleAddToCart}
       />
+
+      {/* Recent Orders Social Proof Notification */}
+      <RecentOrdersToast />
 
       {/* Fragrance Detail Modal */}
       <ProductDetailModal

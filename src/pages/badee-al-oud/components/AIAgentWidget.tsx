@@ -14,17 +14,17 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
   onAddToCart,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [showPreviewBubble, setShowPreviewBubble] = useState(true);
+  const [showPreviewBubble, setShowPreviewBubble] = useState(false);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'msg-welcome',
       sender: 'agent',
-      text: 'Jambo handsome... Welcome to Juba Fashion Hub! I\'m Amina, your personal fragrance partner. What kind of scent are you looking for today — a fresh daytime vibe or an alluring night perfume?',
+      text: 'Jambo! Welcome to Juba Fashion Hub. I\'m Amina from our sales team. What kind of scent are you looking for today — a fresh daytime vibe or a bold night perfume?',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       quickActions: [
-        { label: '🔥 Best Night Perfume', action: 'Amina darling, which fragrance is guaranteed to make heads turn at night?' },
+        { label: '🔥 Best Night Perfume', action: 'Which fragrance is guaranteed to make heads turn at night?' },
         { label: '🛍️ Order Directly in Chat', action: 'I want to place an order directly with you right now!' },
         { label: '🚚 Delivery Rules in Juba', action: 'What are your delivery time and payment rules in Juba?' },
       ],
@@ -32,6 +32,19 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
   ]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Show a preview bubble on a repeating 10s cadence (hidden 10s, shown 10s)
+  // instead of popping up immediately, until the visitor actually opens the
+  // chat.
+  useEffect(() => {
+    if (isOpen) return;
+    let visible = false;
+    const timer = setInterval(() => {
+      visible = !visible;
+      setShowPreviewBubble(visible);
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -122,12 +135,12 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
             </div>
             <div>
               <span className="text-[11px] sm:text-xs font-bold text-white block">Amina • Juba Fashion Hub</span>
-              <span className="text-[9px] sm:text-[10px] text-purple-400 font-semibold block">AI Fragrance Partner</span>
+              <span className="text-[9px] sm:text-[10px] text-purple-400 font-semibold block">Sales Team</span>
             </div>
           </div>
 
           <p className="text-[11px] sm:text-xs text-gray-300 leading-snug">
-            Jambo darling... Tell me, what fragrance vibe are you looking for today?
+            Jambo! Tell me, what fragrance vibe are you looking for today?
           </p>
 
           <button
@@ -158,7 +171,7 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
               />
               <span className="absolute bottom-0 right-0 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 border border-slate-900"></span>
             </div>
-            <span className="text-xs font-bold">Ask AI</span>
+            <span className="text-xs font-bold">Chat with Us</span>
           </button>
         </div>
       )}
@@ -179,7 +192,7 @@ export const AIAgentWidget: React.FC<AIAgentWidgetProps> = ({
                 <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-slate-900"></span>
               </div>
               <div>
-                <h3 className="text-xs font-bold text-white">Amina • AI Fragrance Partner</h3>
+                <h3 className="text-xs font-bold text-white">Amina • Sales Team</h3>
                 <span className="text-[9px] text-emerald-400 flex items-center gap-1 font-semibold">
                   Online in Juba
                 </span>

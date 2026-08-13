@@ -5,7 +5,7 @@ export const label = 'The 9 Collection';
 export const perfumesData = PERFUMES_DATA;
 
 export const systemInstruction = `
-You are Amina, the flirty, charming, and seductive AI Fragrance Partner & Sales Specialist for Juba Fashion Hub in South Sudan.
+You are Amina, a warm, friendly, and confident member of the Juba Fashion Hub sales team in South Sudan, specializing in fragrances.
 
 CRITICAL COMMUNICATION RULES:
 1. SHORT & CONCISE: Never give long boring details or giant dumps of notes. Keep your messages short, friendly, and direct (max 2-3 short sentences).
@@ -18,10 +18,10 @@ HELP / HUMAN ASSISTANCE FORWARDING:
 [FORWARD_HELP: {"customerPhone":"Phone Number", "customerQuery":"Detailed explanation of what client needs help with"}]
 
 PERSONALITY & TONE:
-- Flirty, warm, elegant, playful, and confident ("Jambo handsome...", "Hello darling...", "Looking to make heads turn in Juba tonight?").
+- Warm, friendly, elegant, and confident ("Jambo!", "Hello there!", "Ready to make a great impression in Juba tonight?").
 - Focus on emotion: Sell how they will feel and the compliments they will receive.
 - Masterful objection handling:
-  * "Is it expensive?": "Darling, true luxury beast-mode projection is an investment in your confidence. Plus, if you grab 2 bottles today, I automatically take -$5 off EACH bottle ($10 / 80,000 SSP total savings)!"
+  * "Is it expensive?": "True luxury beast-mode projection is an investment in your confidence. Plus, if you grab 2 bottles today, you automatically get -$5 off EACH bottle ($10 / 80,000 SSP total savings)!"
   * "Is it original?": "100% authentic imported Afnan bottles, guaranteed! Your presence deserves nothing less."
 
 AFNAN 100ML EDP COLLECTION (Quick Specs):
@@ -55,19 +55,19 @@ export function generateSmartFallbackResponse(userText: string, currency: string
   const query = userText.toLowerCase();
 
   if (query.includes('night') || query.includes('club') || query.includes('party') || query.includes('date') || query.includes('attract') || query.includes('rebel') || query.includes('elixir')) {
-    return `Jambo handsome! For high-impact night projection in Juba, I highly recommend 9PM Rebel ($40 / 320,000 SSP) or 9PM Elixir ($40 / 320,000 SSP). 9PM Rebel has magnetic pineapple, mandarin, and warm woods that make heads turn immediately. Should I add 9PM Rebel to your cart? [RECOMMEND: 9pm-rebel]`;
+    return `Jambo! For high-impact night projection in Juba, I highly recommend 9PM Rebel ($40 / 320,000 SSP) or 9PM Elixir ($40 / 320,000 SSP). 9PM Rebel has magnetic pineapple, mandarin, and warm woods that make heads turn immediately. Should I add 9PM Rebel to your cart? [RECOMMEND: 9pm-rebel]`;
   }
 
   if (query.includes('day') || query.includes('office') || query.includes('fresh') || query.includes('summer') || query.includes('dive')) {
-    return `Hello darling! For fresh daytime confidence and office heat, 9AM Dive ($40 / 320,000 SSP) is unmatched with iced mint, juicy lemon, and smooth sandalwood. Would you like me to reserve a bottle for 120-minute delivery in Juba? [RECOMMEND: 9am-dive]`;
+    return `Hello! For fresh daytime confidence and office heat, 9AM Dive ($40 / 320,000 SSP) is unmatched with iced mint, juicy lemon, and smooth sandalwood. Would you like me to reserve a bottle for 120-minute delivery in Juba? [RECOMMEND: 9am-dive]`;
   }
 
   if (query.includes('women') || query.includes('lady') || query.includes('female') || query.includes('pour femme') || query.includes('gift')) {
-    return `Aww, looking for a luxurious scent for a special woman? 9PM Pour Femme ($35 / 280,000 SSP) is a breathtaking blend of raspberry, peony, iris, and warm cedar-amber. Should I prepare a bottle for express dispatch today? [RECOMMEND: 9pm-pour-femme]`;
+    return `Looking for a luxurious scent for a special woman? 9PM Pour Femme ($35 / 280,000 SSP) is a breathtaking blend of raspberry, peony, iris, and warm cedar-amber. Should I prepare a bottle for express dispatch today? [RECOMMEND: 9pm-pour-femme]`;
   }
 
   if (query.includes('price') || query.includes('cost') || query.includes('ssp') || query.includes('usd') || query.includes('discount')) {
-    return `Darling, our authentic Afnan 100ml EDP bottles are priced at $35–$40 USD (${currency === 'SSP' ? '280,000–320,000 SSP' : '$35–$40'}). Plus, if you order 2 or more bottles today, you automatically get a -$5 USD discount per bottle! Which fragrance shall we get for you?`;
+    return `Our authentic Afnan 100ml EDP bottles are priced at $35–$40 USD (${currency === 'SSP' ? '280,000–320,000 SSP' : '$35–$40'}). Plus, if you order 2 or more bottles today, you automatically get a -$5 USD discount per bottle! Which fragrance shall we get for you?`;
   }
 
   if (query.includes('deliver') || query.includes('juba') || query.includes('location') || query.includes('time') || query.includes('ship')) {
@@ -78,5 +78,5 @@ export function generateSmartFallbackResponse(userText: string, currency: string
     return `I would love to place your order directly right now! Please share your Full Name, Phone Number, Juba Delivery Location, and choice of perfume (e.g., 9PM Rebel).`;
   }
 
-  return `Jambo! Welcome to Juba Fashion Hub. I am Amina, your personal fragrance specialist. Are you looking for a seductive night fragrance like 9PM Rebel or a fresh daytime scent like 9AM Dive? Tell me what vibe you want!`;
+  return `Jambo! Welcome to Juba Fashion Hub. I am Amina from our sales team. Are you looking for a bold night fragrance like 9PM Rebel or a fresh daytime scent like 9AM Dive? Tell me what vibe you want!`;
 }

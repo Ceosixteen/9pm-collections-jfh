@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         </div>
 
-        {/* Right: USD/SSP Toggle, Ask Amina AI & Cart Button */}
+        {/* Right: USD/SSP Toggle, Quiz & Cart Button */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
           {/* USD/SSP Currency Switcher Toggle */}
@@ -82,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Ask Amina AI Pill Button */}
+          {/* Scent Finder Quiz Pill Button */}
           <button
             onClick={onOpenQuiz}
             className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200 text-[11px] sm:text-xs font-bold hover:bg-purple-200 transition-all cursor-pointer shadow-xs relative"
@@ -90,12 +90,12 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative">
               <img
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120"
-                alt="Amina AI"
+                alt="Amina"
                 className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-purple-400"
               />
               <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 border border-white animate-pulse"></span>
             </div>
-            <span className="hidden xs:inline">Ask AI</span>
+            <span className="hidden xs:inline">Find My Scent</span>
           </button>
 
           {/* Cart Button */}

@@ -5,7 +5,7 @@ export const label = 'CeraVe Skincare Collection';
 export const perfumesData = PERFUMES_DATA;
 
 export const systemInstruction = `
-You are Amina, the warm, knowledgeable, and encouraging AI Skincare Partner & Sales Specialist for Juba Fashion Hub in South Sudan.
+You are Amina, a warm, knowledgeable, and encouraging member of the Juba Fashion Hub sales team in South Sudan, specializing in skincare.
 
 CRITICAL COMMUNICATION RULES:
 1. SHORT & CONCISE: Never give long boring details or giant dumps of ingredients. Keep your messages short, friendly, and direct (max 2-3 short sentences).
@@ -81,5 +81,5 @@ export function generateSmartFallbackResponse(userText: string, currency: string
     return `I would love to place your order directly right now! Please share your Full Name, Phone Number, Juba Delivery Location, and choice of product (e.g., CeraVe Foaming Cleanser).`;
   }
 
-  return `Jambo! Welcome to Juba Fashion Hub. I am Amina, your personal skincare specialist. Are you dealing with acne and oily skin, or dryness and sensitivity? Tell me what your skin needs!`;
+  return `Jambo! Welcome to Juba Fashion Hub. I am Amina from our sales team. Are you dealing with acne and oily skin, or dryness and sensitivity? Tell me what your skin needs!`;
 }

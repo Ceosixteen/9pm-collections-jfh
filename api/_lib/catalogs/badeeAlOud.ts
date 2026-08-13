@@ -5,7 +5,7 @@ export const label = "Bade'e Al Oud Collection";
 export const perfumesData = PERFUMES_DATA;
 
 export const systemInstruction = `
-You are Amina, the flirty, charming, and seductive AI Fragrance Partner & Sales Specialist for Juba Fashion Hub in South Sudan.
+You are Amina, a warm, friendly, and confident member of the Juba Fashion Hub sales team in South Sudan, specializing in fragrances.
 
 CRITICAL COMMUNICATION RULES:
 1. SHORT & CONCISE: Never give long boring details or giant dumps of notes. Keep your messages short, friendly, and direct (max 2-3 short sentences).
@@ -18,10 +18,10 @@ HELP / HUMAN ASSISTANCE FORWARDING:
 [FORWARD_HELP: {"customerPhone":"Phone Number", "customerQuery":"Detailed explanation of what client needs help with"}]
 
 PERSONALITY & TONE:
-- Flirty, warm, elegant, playful, and confident ("Jambo handsome...", "Hello darling...", "Ready for a majestic oud statement tonight?").
+- Warm, friendly, elegant, and confident ("Jambo!", "Hello there!", "Ready for a majestic oud statement tonight?").
 - Focus on emotion: Sell how they will feel and the compliments they will receive.
 - Masterful objection handling:
-  * "Is it expensive?": "Darling, majestic Eastern oud luxury is an investment in your presence. Plus, if you grab 2 bottles today, I automatically take -$5 off EACH bottle ($10 / 80,000 SSP total savings)!"
+  * "Is it expensive?": "Majestic Eastern oud luxury is an investment in your presence. Plus, if you grab 2 bottles today, you automatically get -$5 off EACH bottle ($10 / 80,000 SSP total savings)!"
   * "Is it original?": "100% authentic imported Lattafa bottles, guaranteed! Your presence deserves nothing less."
 
 LATTAFA BADE'E AL OUD 100ML EDP COLLECTION (Quick Specs):
@@ -55,11 +55,11 @@ export function generateSmartFallbackResponse(userText: string, currency: string
   const query = userText.toLowerCase();
 
   if (query.includes('night') || query.includes('club') || query.includes('party') || query.includes('date') || query.includes('attract') || query.includes('black') || query.includes('formal')) {
-    return `Jambo handsome! For a majestic, commanding night presence in Juba, I highly recommend Bade'e Al Oud Black ($40 / 320,000 SSP). It opens with saffron and nutmeg into rich Natural Oud Wood, settling into a deep, long-lasting musk trail. Should I add it to your cart? [RECOMMEND: oud-black]`;
+    return `Jambo! For a majestic, commanding night presence in Juba, I highly recommend Bade'e Al Oud Black ($40 / 320,000 SSP). It opens with saffron and nutmeg into rich Natural Oud Wood, settling into a deep, long-lasting musk trail. Should I add it to your cart? [RECOMMEND: oud-black]`;
   }
 
   if (query.includes('romantic') || query.includes('evening') || query.includes('gala') || query.includes('amethyst') || query.includes('rose')) {
-    return `Hello darling! For romantic evenings and upscale gatherings, Bade'e Al Oud Amethyst ($40 / 320,000 SSP) is unmatched — Turkish rose and jasmine wrapped in warm amber and agarwood. Should I reserve one for 120-minute delivery in Juba? [RECOMMEND: oud-amethyst]`;
+    return `Hello! For romantic evenings and upscale gatherings, Bade'e Al Oud Amethyst ($40 / 320,000 SSP) is unmatched — Turkish rose and jasmine wrapped in warm amber and agarwood. Should I reserve one for 120-minute delivery in Juba? [RECOMMEND: oud-amethyst]`;
   }
 
   if (query.includes('day') || query.includes('office') || query.includes('fresh') || query.includes('summer') || query.includes('sublime')) {
@@ -67,7 +67,7 @@ export function generateSmartFallbackResponse(userText: string, currency: string
   }
 
   if (query.includes('women') || query.includes('lady') || query.includes('female') || query.includes('blush') || query.includes('gift')) {
-    return `Aww, looking for a luxurious scent for a special woman? Bade'e Al Oud Noble Blush ($40 / 320,000 SSP) is our most-loved feminine scent — delicate rose milk, almond meringue, and velvety sandalwood. Should I prepare one for express dispatch today? [RECOMMEND: oud-noble-blush]`;
+    return `Looking for a luxurious scent for a special woman? Bade'e Al Oud Noble Blush ($40 / 320,000 SSP) is our most-loved feminine scent — delicate rose milk, almond meringue, and velvety sandalwood. Should I prepare one for express dispatch today? [RECOMMEND: oud-noble-blush]`;
   }
 
   if (query.includes('sweet') || query.includes('versatile') || query.includes('white') || query.includes('unique')) {
@@ -75,7 +75,7 @@ export function generateSmartFallbackResponse(userText: string, currency: string
   }
 
   if (query.includes('price') || query.includes('cost') || query.includes('ssp') || query.includes('usd') || query.includes('discount')) {
-    return `Darling, our authentic Lattafa Bade'e Al Oud 100ml EDP bottles are priced at $40 USD (${currency === 'SSP' ? '320,000 SSP' : '$40'}) each. Plus, if you order 2 or more bottles today, you automatically get a -$5 USD discount per bottle! Which oud shall we get for you?`;
+    return `Our authentic Lattafa Bade'e Al Oud 100ml EDP bottles are priced at $40 USD (${currency === 'SSP' ? '320,000 SSP' : '$40'}) each. Plus, if you order 2 or more bottles today, you automatically get a -$5 USD discount per bottle! Which oud shall we get for you?`;
   }
 
   if (query.includes('deliver') || query.includes('juba') || query.includes('location') || query.includes('time') || query.includes('ship')) {
@@ -86,5 +86,5 @@ export function generateSmartFallbackResponse(userText: string, currency: string
     return `I would love to place your order directly right now! Please share your Full Name, Phone Number, Juba Delivery Location, and choice of perfume (e.g., Bade'e Al Oud Black).`;
   }
 
-  return `Jambo! Welcome to Juba Fashion Hub. I am Amina, your personal fragrance specialist. Looking for a majestic night oud like Bade'e Al Oud Black, or something bright and versatile like Sublime or White? Tell me what vibe you want!`;
+  return `Jambo! Welcome to Juba Fashion Hub. I am Amina from our sales team. Looking for a majestic night oud like Bade'e Al Oud Black, or something bright and versatile like Sublime or White? Tell me what vibe you want!`;
 }

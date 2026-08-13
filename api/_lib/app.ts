@@ -254,7 +254,7 @@ export function createApp(): express.Express {
       `✨ <i>Juba Fashion Hub</i>`;
   }
 
-  // 1. AI Fragrance Sales Agent Chat API Endpoint
+  // 1. Sales Team Chat API Endpoint
   app.post('/api/chat', async (req, res) => {
     try {
       const { message, chatHistory, selectedCurrency = 'SSP', storeSlug } = req.body;
@@ -265,7 +265,7 @@ export function createApp(): express.Express {
 
       const catalog = resolveCatalog(storeSlug);
 
-      // System Prompt for Amina - AI Sales Specialist & Order Concierge (per-collection persona)
+      // System Prompt for Amina - Sales Team Concierge (per-collection persona)
       const systemInstruction = catalog.systemInstruction;
 
       const promptText = `
@@ -337,7 +337,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
               `📞 <b>Customer Phone:</b> ${customerPhone}\n` +
               `💬 <b>Client Question / Request:</b> ${customerQuery}\n` +
               `📅 <b>Time:</b> ${new Date().toLocaleString()}\n\n` +
-              `✨ <i>Amina AI collected this query and forwarded it to your Telegram bot. Please contact this client directly!</i>`;
+              `✨ <i>Amina collected this query and forwarded it to your Telegram bot. Please contact this client directly!</i>`;
 
             await fetch(tgUrl, {
               method: 'POST',
@@ -404,7 +404,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
             customerEmail: '',
             deliveryCity: 'Juba',
             deliveryAddress: orderPayload.deliveryAddress || 'Juba Town',
-            notes: 'Placed directly via Amina AI Sales Specialist',
+            notes: 'Placed directly via Amina (Sales Chat)',
             paymentMethod: orderPayload.paymentMethod || 'cod',
             paymentStatus: 'pending',
             createdAt: new Date().toISOString(),
@@ -464,7 +464,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (error: any) {
       console.error('Gemini Chat Error:', error);
       return res.status(500).json({
-        error: 'Failed to process AI chat response',
+        error: 'Failed to process chat response',
         details: error?.message || String(error),
       });
     }

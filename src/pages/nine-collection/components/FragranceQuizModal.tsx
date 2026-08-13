@@ -129,7 +129,7 @@ export const FragranceQuizModal: React.FC<FragranceQuizModalProps> = ({
         {step === 2 && (
           <div className="space-y-4 animate-fadeIn">
             <h4 className="text-sm font-extrabold text-slate-900 text-center">
-              2. Which fragrance notes sound most seductive to you?
+              2. Which fragrance notes sound most appealing to you?
             </h4>
 
             <div className="space-y-2">

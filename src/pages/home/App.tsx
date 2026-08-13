@@ -4,6 +4,7 @@ import { Hero } from './components/Hero';
 import { MarqueeBanner } from './components/MarqueeBanner';
 import { CollectionsGrid } from './components/CollectionsGrid';
 import { Footer } from './components/Footer';
+import { RecentOrdersToast } from './components/RecentOrdersToast';
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
       <MarqueeBanner />
       <CollectionsGrid />
       <Footer />
+      <RecentOrdersToast />
     </div>
   );
 }
