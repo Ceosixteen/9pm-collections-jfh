@@ -1,5 +1,4 @@
 import express from 'express';
-import { GoogleGenAI } from '@google/genai';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
 import { db, setDoc, doc, collection, getDocs, query, orderBy, limit } from '../../src/lib/firebase.js';
@@ -36,15 +35,41 @@ let currentTelegramConfig: TelegramConfig = {
 };
 let ordersStore: Order[] = [];
 
-// Initialize Gemini AI client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
+// Groq chat completions helper (OpenAI-compatible API). Throws on any
+// failure so callers can fall back to a secondary model or the
+// rule-based responses.
+async function callGroq(
+  systemInstruction: string,
+  userContent: string,
+  temperature: number,
+  model: string
+): Promise<string> {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
     headers: {
-      'User-Agent': 'aistudio-build',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
     },
-  },
-});
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: userContent },
+      ],
+      temperature,
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`Groq API error ${res.status}: ${errBody}`);
+  }
+
+  const data: any = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Groq API returned no content');
+  return text;
+}
 
 // Firestore Persistence Helpers
 async function saveOrderToFirestore(order: Order) {
@@ -200,20 +225,12 @@ INSTRUCTIONS FOR ALEX:
 `;
 
   try {
-    const aiRes = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: `Admin query: "${incomingText}"`,
-      config: {
-        systemInstruction: alexSystemPrompt,
-        temperature: 0.5,
-      },
-    });
-
-    if (aiRes.text && aiRes.text.trim()) {
-      return aiRes.text.trim();
+    const text = await callGroq(alexSystemPrompt, `Admin query: "${incomingText}"`, 0.5, 'llama-3.3-70b-versatile');
+    if (text && text.trim()) {
+      return text.trim();
     }
   } catch (err) {
-    console.warn('Alex Gemini call failed, using smart admin fallback:', err);
+    console.warn('Alex Groq call failed, using smart admin fallback:', err);
   }
 
   return generateAlexFallbackResponse(incomingText, totalOrdersCount, totalUSDRevenue, totalSSPRevenue, allOrders, helpRequests);
@@ -279,29 +296,13 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       let responseText = '';
 
       try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
-          contents: promptText,
-          config: {
-            systemInstruction,
-            temperature: 0.7,
-          },
-        });
-        responseText = response.text || '';
+        responseText = await callGroq(systemInstruction, promptText, 0.7, 'llama-3.3-70b-versatile');
       } catch (e1) {
-        console.warn('gemini-3.6-flash failed, trying gemini-2.5-flash:', e1);
+        console.warn('Groq llama-3.3-70b-versatile failed, trying llama-3.1-8b-instant:', e1);
         try {
-          const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: promptText,
-            config: {
-              systemInstruction,
-              temperature: 0.7,
-            },
-          });
-          responseText = response.text || '';
+          responseText = await callGroq(systemInstruction, promptText, 0.7, 'llama-3.1-8b-instant');
         } catch (e2) {
-          console.warn('gemini-2.5-flash failed, using smart fallback engine:', e2);
+          console.warn('Groq llama-3.1-8b-instant failed, using smart fallback engine:', e2);
           responseText = catalog.generateSmartFallbackResponse(message, selectedCurrency);
         }
       }
@@ -462,7 +463,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         helpForwarded,
       });
     } catch (error: any) {
-      console.error('Gemini Chat Error:', error);
+      console.error('Chat Error:', error);
       return res.status(500).json({
         error: 'Failed to process chat response',
         details: error?.message || String(error),
