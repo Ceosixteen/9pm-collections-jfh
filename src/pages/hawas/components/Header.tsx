@@ -24,7 +24,6 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectCategory,
 }) => {
   const categories = [
-    { id: 'all', label: 'All Items' },
     { id: 'hawas', label: 'Rasasi Hawas Collection' },
     { id: 'bundles', label: 'Perfume Bundles' },
   ];
@@ -120,6 +119,12 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Category Navigation Strip - Vibrant Purple */}
       <div className="w-full bg-[#B24BF3] text-white shadow-xs overflow-x-auto no-scrollbar">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-1 sm:py-2 flex items-center justify-center sm:justify-start gap-1.5 text-[11px] sm:text-xs font-bold whitespace-nowrap">
+          <Link
+            to="/"
+            className="px-3 sm:px-5 py-1 sm:py-1.5 rounded-full transition-all text-white/90 hover:text-white hover:bg-white/10"
+          >
+            All Items
+          </Link>
           {categories.map((cat) => {
             const isActive = selectedCategory === cat.id;
             return (

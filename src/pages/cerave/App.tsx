@@ -170,7 +170,7 @@ export default function App() {
         selectedCategory={selectedCategory}
         onSelectCategory={(cat) => {
           setSelectedCategory(cat);
-          scrollToSection('collection');
+          scrollToSection(cat === 'bundles' ? 'bundles' : 'collection');
         }}
       />
 
