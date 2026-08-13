@@ -71,6 +71,31 @@ async function callGroq(
   return text;
 }
 
+// Extracts the JSON payload following a "[TAGNAME: {...}]" marker without
+// assuming the model closed it perfectly. Groq/Llama sometimes malforms or
+// duplicates trailing structure (unlike Gemini, which was reliable here), so
+// rather than a lazy "first }" regex match — which truncates mid-object and
+// leaks a broken tail into the reply — this takes everything after the
+// marker up to the LAST "}" in the remaining text and parses that. Tags are
+// documented in the system prompt to always be the final thing in the
+// message, so this is safe.
+function extractTaggedJson(text: string, tagName: string): any | undefined {
+  const marker = `[${tagName}:`;
+  const idx = text.indexOf(marker);
+  if (idx === -1) return undefined;
+
+  let jsonPart = text.slice(idx + marker.length);
+  const lastBrace = jsonPart.lastIndexOf('}');
+  if (lastBrace === -1) return undefined;
+  jsonPart = jsonPart.slice(0, lastBrace + 1).trim();
+
+  try {
+    return JSON.parse(jsonPart);
+  } catch {
+    return undefined;
+  }
+}
+
 // Best-effort fallback for when the model names a product in its reply
 // without the [RECOMMEND: id] tag. Matches on the product's core name
 // (stripped of " by Brand" suffixes), longest name first so more specific
@@ -347,10 +372,9 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       }
 
       // Handle Help Forwarding to Telegram
-      const helpMatch = responseText.match(/\[FORWARD_HELP:\s*(\{.*?\})\]/s);
-      if (helpMatch && helpMatch[1]) {
+      const helpData = extractTaggedJson(responseText, 'FORWARD_HELP');
+      if (helpData) {
         try {
-          const helpData = JSON.parse(helpMatch[1]);
           const customerPhone = helpData.customerPhone || 'Not specified';
           const customerQuery = helpData.customerQuery || 'Requested human support';
 
@@ -390,10 +414,10 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       }
 
       // Handle Direct Chat Order Creation & Telegram Notification
-      const orderMatch = responseText.match(/\[CREATE_ORDER:\s*(\{.*?\})\]/s);
-      if (orderMatch && orderMatch[1]) {
+      const extractedOrder = extractTaggedJson(responseText, 'CREATE_ORDER');
+      if (extractedOrder) {
         try {
-          orderPayload = JSON.parse(orderMatch[1]);
+          orderPayload = extractedOrder;
           const orderId = `JFH-${Math.floor(100000 + Math.random() * 900000)}`;
 
           const itemsList = (orderPayload.items || []).map((it: any) => {
@@ -475,10 +499,12 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         }
       }
 
+      // Tags are documented to always be the final thing in the message, so
+      // truncate at the first one found rather than regex-removing each —
+      // Groq/Llama sometimes malforms the trailing JSON in a way a lazy
+      // regex can't cleanly strip, leaking a broken fragment into the reply.
       const cleanText = responseText
-        .replace(/\[RECOMMEND:\s*([a-zA-Z0-9_-]+)\]/g, '')
-        .replace(/\[CREATE_ORDER:\s*(\{.*?\})\]/gs, '')
-        .replace(/\[FORWARD_HELP:\s*(\{.*?\})\]/gs, '')
+        .split(/\[RECOMMEND:|\[CREATE_ORDER:|\[FORWARD_HELP:/)[0]
         .replace(/\*\*/g, '')
         .trim();
 
