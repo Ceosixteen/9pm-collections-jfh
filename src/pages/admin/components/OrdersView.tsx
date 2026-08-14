@@ -141,7 +141,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
               <th className="pb-2.5 font-bold pr-3">Total</th>
               <th className="pb-2.5 font-bold pr-3">Telegram</th>
               <th className="pb-2.5 font-bold pr-3">Status</th>
-              <th className="pb-2.5 font-bold">Date</th>
+              <th className="pb-2.5 font-bold">Placed</th>
             </tr>
           </thead>
           <tbody>
@@ -210,7 +210,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
                   </select>
                 </td>
                 <td className="py-3 text-slate-500 whitespace-nowrap">
-                  {new Date(o.createdAt).toLocaleDateString()}
+                  <p className="text-slate-400">{new Date(o.createdAt).toLocaleDateString()}</p>
+                  <p className="text-[10px] text-slate-600">
+                    {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </td>
               </tr>
             ))}
