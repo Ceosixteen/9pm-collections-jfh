@@ -6,7 +6,7 @@ import { createApp, startTelegramPolling } from './api/_lib/app.js';
 
 async function startServer() {
   const app = createApp();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Vite Middleware / Static setup
   if (process.env.NODE_ENV !== 'production') {

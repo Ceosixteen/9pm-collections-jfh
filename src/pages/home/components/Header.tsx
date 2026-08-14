@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Phone, ShieldCheck, Truck } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const collections = [
@@ -31,6 +32,24 @@ export const Header: React.FC = () => {
             referrerPolicy="no-referrer"
           />
         </Link>
+
+        <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600">
+          <a
+            href="tel:+211911267703"
+            className="flex items-center gap-1.5 hover:text-[#B24BF3] transition-colors"
+          >
+            <Phone className="w-3.5 h-3.5 text-[#B24BF3]" />
+            <span>+211 911 267 703</span>
+          </a>
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#B24BF3]" />
+            <span>100% Authentic Imports</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Truck className="w-3.5 h-3.5 text-[#B24BF3]" />
+            <span>Free Delivery in Juba</span>
+          </div>
+        </div>
 
         <a
           href="tel:+211911267703"
