@@ -25,6 +25,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [deliveryCity, setDeliveryCity] = useState('Juba');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentCurrency, setPaymentCurrency] = useState<Currency>(currency);
@@ -80,6 +81,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     try {
       const payload = {
+        storeSlug: 'badee-al-oud',
         items: items.map((it) => ({
           productId: it.product.id,
           productName: it.product.name,
@@ -97,6 +99,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         sspLiquidationFee,
         customerName,
         customerPhone,
+        customerEmail,
         deliveryCity,
         deliveryAddress,
         paymentMethod,
@@ -363,6 +366,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       placeholder="+211 911 XXX XXX"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 text-slate-900 focus:outline-none focus:border-[#B24BF3]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Email (Optional)</label>
+                    <input
+                      type="email"
+                      placeholder="e.g. akuol@example.com"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 text-slate-900 focus:outline-none focus:border-[#B24BF3]"
                     />
                   </div>

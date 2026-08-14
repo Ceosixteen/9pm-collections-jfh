@@ -74,9 +74,15 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-          <p>
+          <a
+            href="https://admin.jubafashionhub.link"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Admin Portal"
+            className="hover:text-gray-300 transition-colors"
+          >
             © {new Date().getFullYear()} Juba Fashion Hub. All rights reserved. Original Imports.
-          </p>
+          </a>
           <div className="flex items-center gap-4 text-gray-300">
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-[#B24BF3]" />

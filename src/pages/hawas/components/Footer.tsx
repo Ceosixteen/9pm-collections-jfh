@@ -1,15 +1,7 @@
 import React from 'react';
 import { MapPin, Phone, ShieldCheck, Clock } from 'lucide-react';
 
-interface FooterProps {
-  onOpenTelegramAdmin?: () => void;
-  onOpenKnowledgeBaseAdmin?: () => void;
-}
-
-export const Footer: React.FC<FooterProps> = ({
-  onOpenTelegramAdmin,
-  onOpenKnowledgeBaseAdmin,
-}) => {
+export const Footer: React.FC = () => {
   return (
     <footer className="bg-[#18181B] text-gray-300 border-t border-gray-800 pt-12 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
@@ -77,12 +69,15 @@ export const Footer: React.FC<FooterProps> = ({
 
         {/* Bottom Bar */}
         <div className="pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-          <p 
-            onClick={onOpenTelegramAdmin} 
-            className="cursor-pointer hover:text-gray-300 transition-colors title='Admin Portal'"
+          <a
+            href="https://admin.jubafashionhub.link"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Admin Portal"
+            className="hover:text-gray-300 transition-colors"
           >
             © {new Date().getFullYear()} Juba Fashion Hub. All rights reserved. Original Imports.
-          </p>
+          </a>
           <div className="flex items-center gap-4 text-gray-300">
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-[#B24BF3]" />

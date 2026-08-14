@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
 import { db, setDoc, doc, collection, getDocs, query, orderBy, limit } from '../../src/lib/firebase.js';
@@ -23,6 +24,68 @@ const CATALOGS: Record<string, Catalog> = {
 
 function resolveCatalog(storeSlug?: string): Catalog {
   return (storeSlug && CATALOGS[storeSlug]) || nineCollectionCatalog;
+}
+
+// --- Admin authentication -------------------------------------------------
+// Stateless HMAC-signed session cookie (no database/session store needed —
+// this backend runs as a Vercel serverless function, so anything kept in
+// memory doesn't persist across invocations). The signing secret and admin
+// credentials are read from environment variables, never hardcoded.
+const ADMIN_SESSION_SECRET = process.env.ADMIN_SESSION_SECRET || 'dev-only-insecure-secret-change-me';
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const ADMIN_SESSION_COOKIE = 'jfh_admin_session';
+const ADMIN_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+function signAdminSession(username: string, expiresAt: number): string {
+  const payload = `${username}.${expiresAt}`;
+  const sig = crypto.createHmac('sha256', ADMIN_SESSION_SECRET).update(payload).digest('hex');
+  return Buffer.from(`${payload}.${sig}`).toString('base64url');
+}
+
+function verifyAdminSession(token: string | undefined): boolean {
+  if (!token) return false;
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf-8');
+    const parts = decoded.split('.');
+    if (parts.length !== 3) return false;
+    const [username, expiresAtStr, sig] = parts;
+    const expiresAt = Number(expiresAtStr);
+    if (!username || !expiresAt || !sig || Date.now() > expiresAt) return false;
+    const expectedSig = crypto.createHmac('sha256', ADMIN_SESSION_SECRET).update(`${username}.${expiresAtStr}`).digest('hex');
+    const sigBuf = Buffer.from(sig);
+    const expectedBuf = Buffer.from(expectedSig);
+    return sigBuf.length === expectedBuf.length && crypto.timingSafeEqual(sigBuf, expectedBuf);
+  } catch {
+    return false;
+  }
+}
+
+function parseCookies(cookieHeader?: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!cookieHeader) return out;
+  cookieHeader.split(';').forEach((pair) => {
+    const idx = pair.indexOf('=');
+    if (idx === -1) return;
+    out[pair.slice(0, idx).trim()] = decodeURIComponent(pair.slice(idx + 1).trim());
+  });
+  return out;
+}
+
+function setAdminSessionCookie(res: express.Response, token: string, maxAgeSeconds: number) {
+  const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly${secureFlag}; SameSite=Strict; Path=/; Max-Age=${maxAgeSeconds}`
+  );
+}
+
+function requireAdminAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const cookies = parseCookies(req.headers.cookie);
+  if (!verifyAdminSession(cookies[ADMIN_SESSION_COOKIE])) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
 }
 
 // In-memory state
@@ -284,6 +347,31 @@ INSTRUCTIONS FOR ALEX:
 export function createApp(): express.Express {
   const app = express();
   app.use(express.json());
+
+  // --- Admin auth endpoints ---
+  app.post('/api/admin/login', (req, res) => {
+    const { username, password } = req.body || {};
+    if (!ADMIN_PASSWORD) {
+      return res.status(500).json({ error: 'Admin login is not configured yet (missing ADMIN_PASSWORD).' });
+    }
+    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Invalid username or password.' });
+    }
+    const expiresAt = Date.now() + ADMIN_SESSION_TTL_MS;
+    const token = signAdminSession(username, expiresAt);
+    setAdminSessionCookie(res, token, Math.floor(ADMIN_SESSION_TTL_MS / 1000));
+    return res.json({ success: true });
+  });
+
+  app.post('/api/admin/logout', (req, res) => {
+    setAdminSessionCookie(res, '', 0);
+    return res.json({ success: true });
+  });
+
+  app.get('/api/admin/session', (req, res) => {
+    const cookies = parseCookies(req.headers.cookie);
+    return res.json({ authenticated: verifyAdminSession(cookies[ADMIN_SESSION_COOKIE]) });
+  });
 
   // Helper to format Telegram Order Message for Juba Fashion Hub
   function formatTelegramOrderMessage(order: Order): string {
@@ -623,6 +711,27 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     }
   });
 
+  // Lightweight page-view tracking, fired once per page load from every
+  // storefront. Public (no auth) since it's a write-only counter, not a
+  // data-exposing read. Fire-and-forget from the client, so failures here
+  // should never surface to the visitor.
+  app.post('/api/track-pageview', async (req, res) => {
+    try {
+      const { storeSlug, path: pagePath } = req.body || {};
+      const id = `pv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      await setDoc(doc(db, 'pageviews', id), {
+        id,
+        storeSlug: storeSlug || 'unknown',
+        path: pagePath || '/',
+        createdAt: new Date().toISOString(),
+      });
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('Failed to record pageview:', err);
+      return res.json({ success: false });
+    }
+  });
+
   // Telegram Webhook Handler for Incoming Client Messages
   app.post('/api/telegram/webhook', async (req, res) => {
     try {
@@ -772,25 +881,25 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
 
   // 4. Store & Order Admin Endpoints
   app.get('/api/kb', (req, res) => res.json(currentKnowledgeBase));
-  app.post('/api/kb', (req, res) => {
+  app.post('/api/kb', requireAdminAuth, (req, res) => {
     currentKnowledgeBase = { ...currentKnowledgeBase, ...req.body };
     return res.json({ success: true, kb: currentKnowledgeBase });
   });
 
-  app.get('/api/telegram/config', (req, res) => {
+  app.get('/api/telegram/config', requireAdminAuth, (req, res) => {
     return res.json({
       ...currentTelegramConfig,
       botToken: process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken,
       chatId: process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId,
     });
   });
-  app.post('/api/telegram/config', (req, res) => {
+  app.post('/api/telegram/config', requireAdminAuth, (req, res) => {
     currentTelegramConfig = { ...currentTelegramConfig, ...req.body };
     return res.json({ success: true, config: currentTelegramConfig });
   });
 
   // GET Orders from Firestore & memory
-  app.get('/api/orders', async (req, res) => {
+  app.get('/api/orders', requireAdminAuth, async (req, res) => {
     try {
       const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
       const snapshot = await getDocs(q);
@@ -812,9 +921,85 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     }
   });
 
+  // GET Sales breakdown per landing page (admin dashboard)
+  app.get('/api/admin/sales-by-page', requireAdminAuth, async (req, res) => {
+    try {
+      let allOrders: Order[] = [];
+      try {
+        const q = query(collection(db, 'orders'), limit(1000));
+        const snapshot = await getDocs(q);
+        const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+        const orderMap = new Map<string, Order>();
+        firestoreOrders.forEach((o) => orderMap.set(o.id, o));
+        ordersStore.forEach((o) => {
+          if (!orderMap.has(o.id)) orderMap.set(o.id, o);
+        });
+        allOrders = Array.from(orderMap.values());
+      } catch (err) {
+        console.error('Error fetching orders for sales-by-page aggregation:', err);
+        allOrders = ordersStore;
+      }
+
+      const byStore: Record<string, {
+        label: string;
+        orderCount: number;
+        revenueUSD: number;
+        revenueSSP: number;
+        products: Record<string, { productName: string; quantity: number }>;
+      }> = {};
+
+      for (const order of allOrders) {
+        const slug = order.storeSlug || 'nine-collection';
+        if (!byStore[slug]) {
+          byStore[slug] = {
+            label: CATALOGS[slug]?.label || slug,
+            orderCount: 0,
+            revenueUSD: 0,
+            revenueSSP: 0,
+            products: {},
+          };
+        }
+        const entry = byStore[slug];
+        entry.orderCount += 1;
+        entry.revenueUSD += order.totalUSD || 0;
+        entry.revenueSSP += order.totalSSP || 0;
+
+        (order.items || []).forEach((item) => {
+          if (!entry.products[item.productId]) {
+            entry.products[item.productId] = { productName: item.productName, quantity: 0 };
+          }
+          entry.products[item.productId].quantity += item.quantity || 0;
+        });
+      }
+
+      const result = Object.fromEntries(
+        Object.entries(byStore).map(([slug, entry]) => [
+          slug,
+          {
+            label: entry.label,
+            orderCount: entry.orderCount,
+            revenueUSD: entry.revenueUSD,
+            revenueSSP: entry.revenueSSP,
+            topProducts: Object.values(entry.products)
+              .sort((a, b) => b.quantity - a.quantity)
+              .slice(0, 5),
+          },
+        ])
+      );
+
+      const totalOrders = allOrders.length;
+      const totalRevenueUSD = allOrders.reduce((sum, o) => sum + (o.totalUSD || 0), 0);
+
+      return res.json({ byStore: result, totalOrders, totalRevenueUSD });
+    } catch (err: any) {
+      console.error('Error building sales-by-page report:', err);
+      return res.status(500).json({ error: 'Failed to build sales report', details: err?.message });
+    }
+  });
+
   // GET Client Records — derived from orders, grouped by phone number, across all
   // three storefronts (nine-collection, hawas, cerave) since they share this backend.
-  app.get('/api/clients', async (req, res) => {
+  app.get('/api/clients', requireAdminAuth, async (req, res) => {
     try {
       let allOrders: Order[] = [];
       try {
@@ -903,8 +1088,31 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     }
   });
 
+  // GET Page-view traffic summary per landing page (admin dashboard)
+  app.get('/api/admin/pageviews-summary', requireAdminAuth, async (req, res) => {
+    try {
+      const q = query(collection(db, 'pageviews'), limit(5000));
+      const snapshot = await getDocs(q);
+      const views = snapshot.docs.map((d) => d.data() as { storeSlug?: string; createdAt?: string });
+
+      const byStore: Record<string, number> = {};
+      const byDay: Record<string, number> = {};
+      views.forEach((v) => {
+        const store = v.storeSlug || 'unknown';
+        byStore[store] = (byStore[store] || 0) + 1;
+        const day = (v.createdAt || '').slice(0, 10);
+        if (day) byDay[day] = (byDay[day] || 0) + 1;
+      });
+
+      return res.json({ total: views.length, byStore, byDay });
+    } catch (err: any) {
+      console.error('Error aggregating pageviews:', err);
+      return res.status(500).json({ total: 0, byStore: {}, byDay: {}, error: err?.message });
+    }
+  });
+
   // GET Customer Help Requests from Firestore
-  app.get('/api/help-requests', async (req, res) => {
+  app.get('/api/help-requests', requireAdminAuth, async (req, res) => {
     try {
       const q = query(collection(db, 'helpRequests'), orderBy('createdAt', 'desc'), limit(50));
       const snapshot = await getDocs(q);
@@ -917,7 +1125,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
   });
 
   // POST Resend Telegram notification for an order
-  app.post('/api/orders/:id/resend-telegram', async (req, res) => {
+  app.post('/api/orders/:id/resend-telegram', requireAdminAuth, async (req, res) => {
     try {
       const { id } = req.params;
       let targetOrder = ordersStore.find((o) => o.id === id);

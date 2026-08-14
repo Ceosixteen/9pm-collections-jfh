@@ -9,7 +9,6 @@ interface HeaderProps {
   cartCount: number;
   onOpenCart: () => void;
   onOpenQuiz: () => void;
-  onOpenTelegramAdmin: () => void;
   selectedCategory: string;
   onSelectCategory: (cat: string) => void;
 }

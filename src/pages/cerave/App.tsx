@@ -13,12 +13,11 @@ import { AIAgentWidget } from './components/AIAgentWidget';
 import { RecentOrdersToast } from './components/RecentOrdersToast';
 import { StickyBuyBar } from './components/StickyBuyBar';
 import { Footer } from './components/Footer';
-import { TelegramAdminModal } from './components/TelegramAdminModal';
-import { KnowledgeBaseEditorModal } from './components/KnowledgeBaseEditorModal';
 
-import { PERFUMES_DATA, RECOMMENDED_BUNDLES, REVIEWS_DATA, INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from './data/perfumesData';
-import { Currency, CartItem, PerfumeProduct, RecommendedBundle, Order, TelegramConfig, KnowledgeBase } from './types';
+import { PERFUMES_DATA, RECOMMENDED_BUNDLES, REVIEWS_DATA } from './data/perfumesData';
+import { Currency, CartItem, PerfumeProduct, RecommendedBundle, Order } from './types';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
+import { trackPageview } from '../../lib/trackPageview';
 
 export default function App() {
   const [currency, setCurrency] = useState<Currency>('USD');
@@ -31,31 +30,14 @@ export default function App() {
   // Modals & Drawers
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
-  const [isTelegramAdminOpen, setIsTelegramAdminOpen] = useState(false);
-  const [isKbAdminOpen, setIsKbAdminOpen] = useState(false);
   const [selectedPerfume, setSelectedPerfume] = useState<PerfumeProduct | null>(null);
-
-  // Store Configuration
-  const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(DEFAULT_TELEGRAM_CONFIG);
-  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(INITIAL_KNOWLEDGE_BASE);
 
   // Success Order Confirmation
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if URL has ?admin
-    if (window.location.search.includes('admin')) {
-      setIsTelegramAdminOpen(true);
-    }
-
-    // Fetch initial Telegram Config
-    fetch('/api/telegram/config')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data) setTelegramConfig(data);
-      })
-      .catch((err) => console.error('Failed to load telegram config:', err));
+    trackPageview('cerave');
   }, []);
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -167,7 +149,6 @@ export default function App() {
         cartCount={cartCount}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenQuiz={() => setIsQuizOpen(true)}
-        onOpenTelegramAdmin={() => setIsTelegramAdminOpen(true)}
         selectedCategory={selectedCategory}
         onSelectCategory={(cat) => {
           setSelectedCategory(cat);
@@ -218,10 +199,7 @@ export default function App() {
       />
 
       {/* Footer */}
-      <Footer
-        onOpenTelegramAdmin={() => setIsTelegramAdminOpen(true)}
-        onOpenKnowledgeBaseAdmin={() => setIsKbAdminOpen(true)}
-      />
+      <Footer />
 
       {/* Sales Team Chat Widget */}
       <AIAgentWidget
@@ -261,22 +239,6 @@ export default function App() {
         onRemoveItem={handleRemoveItem}
         onClearCart={() => setCartItems([])}
         onOrderSuccess={(order) => setPlacedOrder(order)}
-      />
-
-      {/* Telegram Admin Modal */}
-      <TelegramAdminModal
-        isOpen={isTelegramAdminOpen}
-        onClose={() => setIsTelegramAdminOpen(false)}
-        config={telegramConfig}
-        onUpdateConfig={(cfg) => setTelegramConfig(cfg)}
-      />
-
-      {/* Knowledge Base Admin Modal */}
-      <KnowledgeBaseEditorModal
-        isOpen={isKbAdminOpen}
-        onClose={() => setIsKbAdminOpen(false)}
-        kb={knowledgeBase}
-        onSaveKb={(updated) => setKnowledgeBase(updated)}
       />
 
       {/* Order Success Confirmation Modal */}

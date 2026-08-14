@@ -4,8 +4,19 @@ import NineCollectionApp from './pages/nine-collection/App';
 import HawasApp from './pages/hawas/App';
 import CeraveApp from './pages/cerave/App';
 import BadeeAlOudApp from './pages/badee-al-oud/App';
+import AdminApp from './pages/admin/App';
 
 export default function App() {
+  // The admin back office is served from its own subdomain
+  // (admin.jubafashionhub.link) rather than a path, so it's routed by
+  // hostname here instead of react-router — same build/deployment, just a
+  // different entry point once the JS boots.
+  const isAdminHost = typeof window !== 'undefined' && window.location.hostname.startsWith('admin.');
+
+  if (isAdminHost) {
+    return <AdminApp />;
+  }
+
   return (
     <Routes>
       <Route path="/" element={<HomeApp />} />
