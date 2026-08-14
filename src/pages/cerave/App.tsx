@@ -89,6 +89,7 @@ export default function App() {
           updated[existingIndex] = {
             ...updated[existingIndex],
             quantity: updated[existingIndex].quantity + 1,
+            bundleName: bundle.name,
           };
         } else {
           updated.push({
@@ -96,6 +97,7 @@ export default function App() {
             quantity: 1,
             unitPriceUSD: p.priceUSD,
             unitPriceSSP: p.priceSSP,
+            bundleName: bundle.name,
           });
         }
       });

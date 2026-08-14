@@ -80,6 +80,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     setOrderError(null);
 
     try {
+      const bundleNames = Array.from(new Set(items.filter((it) => it.bundleName).map((it) => it.bundleName as string)));
+
       const payload = {
         storeSlug: 'cerave',
         items: items.map((it) => ({
@@ -104,6 +106,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         deliveryAddress,
         paymentMethod,
         notes,
+        bundleName: bundleNames.length > 0 ? bundleNames.join(', ') : undefined,
       };
 
       const res = await fetch('/api/order', {

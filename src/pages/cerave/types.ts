@@ -55,6 +55,7 @@ export interface CartItem {
   quantity: number;
   unitPriceUSD: number;
   unitPriceSSP: number;
+  bundleName?: string;
 }
 
 export type PaymentMethod = 'm-gurush' | 'bank_transfer' | 'cod';
@@ -84,6 +85,8 @@ export interface Order {
   notes?: string;
   paymentMethod: PaymentMethod;
   paymentStatus: 'pending' | 'completed';
+  deliveryStatus: 'pending' | 'delivered' | 'canceled';
+  bundleName?: string;
   createdAt: string;
   telegramNotified: boolean;
   telegramError?: string;

@@ -18,6 +18,8 @@ export interface AdminOrder {
   deliveryAddress: string;
   paymentMethod: string;
   paymentStatus: string;
+  deliveryStatus?: 'pending' | 'delivered' | 'canceled';
+  bundleName?: string;
   createdAt: string;
   telegramNotified?: boolean;
   telegramError?: string;

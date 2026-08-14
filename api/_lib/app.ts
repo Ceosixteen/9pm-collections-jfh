@@ -546,6 +546,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
             notes: 'Placed directly via Amina (Sales Chat)',
             paymentMethod: orderPayload.paymentMethod || 'cod',
             paymentStatus: 'pending',
+            deliveryStatus: 'pending',
             createdAt: new Date().toISOString(),
             telegramNotified: false,
           };
@@ -631,6 +632,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         paymentMethod,
         notes,
         storeSlug,
+        bundleName,
       } = req.body;
 
       if (!items || !items.length || !customerName || !customerPhone || !deliveryAddress) {
@@ -657,6 +659,8 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         notes: notes || '',
         paymentMethod,
         paymentStatus: 'pending',
+        deliveryStatus: 'pending',
+        bundleName: bundleName || undefined,
         createdAt: new Date().toISOString(),
         telegramNotified: false,
       };
@@ -1176,6 +1180,37 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         await saveOrderToFirestore(targetOrder);
         return res.status(400).json({ success: false, error: errorMsg });
       }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+  });
+
+  // POST Update an order's delivery/fulfillment status (admin dashboard)
+  app.post('/api/orders/:id/status', requireAdminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body || {};
+      const validStatuses = ['pending', 'delivered', 'canceled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status. Must be one of: pending, delivered, canceled.' });
+      }
+
+      let targetOrder = ordersStore.find((o) => o.id === id);
+      if (!targetOrder) {
+        const q = query(collection(db, 'orders'), limit(500));
+        const snapshot = await getDocs(q);
+        const orders = snapshot.docs.map((d) => d.data() as Order);
+        targetOrder = orders.find((o) => o.id === id);
+      }
+
+      if (!targetOrder) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      targetOrder.deliveryStatus = status;
+      await saveOrderToFirestore(targetOrder);
+
+      return res.json({ success: true, order: targetOrder });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message || String(err) });
     }
