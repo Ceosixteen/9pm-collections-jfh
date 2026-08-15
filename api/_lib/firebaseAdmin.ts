@@ -1,13 +1,23 @@
-// Firebase Admin SDK — used ONLY to generate passwordless sign-in links
-// ourselves (so we can email them via Resend with full branding) instead of
-// letting Firebase's own mail system send its generic, unbranded email.
-// Everything else in this app deliberately avoids the Admin SDK (see
-// src/lib/firebase.ts) — this is the one spot that needs it.
-import { initializeApp, getApps, cert, type App, type ServiceAccount } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
+// Generates passwordless sign-in links ourselves (so we can email them via
+// Resend with full branding) instead of letting Firebase's own mail system
+// send its generic, unbranded email.
+//
+// Deliberately does NOT use the `firebase-admin` npm package — its auth
+// module pulls in `jwks-rsa` -> `jose`, which hits an ESM/CJS interop crash
+// under Vercel's Node serverless bundler (ERR_REQUIRE_ESM). Everything the
+// Admin SDK's `generateSignInWithEmailLink` does under the hood is just a
+// service-account-authenticated REST call, so we replicate that directly
+// with Node's built-in `crypto` + `fetch` — the same "avoid heavy SDKs, use
+// REST" approach already used elsewhere in this backend (see
+// verifyFirebaseIdToken in app.ts).
 import { readFileSync } from 'fs';
+import crypto from 'crypto';
 
-let app: App | undefined;
+interface ServiceAccount {
+  client_email: string;
+  private_key: string;
+  project_id: string;
+}
 
 function loadServiceAccount(): ServiceAccount {
   // Production (Vercel): the full JSON is stored as one env var.
@@ -26,21 +36,84 @@ function loadServiceAccount(): ServiceAccount {
   );
 }
 
-function getFirebaseAdminApp(): App {
-  if (!app) {
-    const existing = getApps();
-    app = existing.length ? existing[0] : initializeApp({ credential: cert(loadServiceAccount()) });
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+// Exchanges the service account's private key for a short-lived Google
+// OAuth2 access token via the JWT-bearer flow (RFC 7523) — signed locally,
+// no external library needed.
+async function getGoogleAccessToken(): Promise<string> {
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) {
+    return cachedToken.token;
   }
-  return app;
+
+  const sa = loadServiceAccount();
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claims = {
+    iss: sa.client_email,
+    sub: sa.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: nowSeconds,
+    exp: nowSeconds + 3600,
+    scope: 'https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/cloud-platform',
+  };
+
+  const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
+  const encodedClaims = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  const signingInput = `${encodedHeader}.${encodedClaims}`;
+
+  const signature = crypto.createSign('RSA-SHA256').update(signingInput).sign(sa.private_key).toString('base64url');
+  const assertion = `${signingInput}.${signature}`;
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to obtain Google access token: ${await res.text()}`);
+  }
+
+  const data: any = await res.json();
+  cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
+  return cachedToken.token;
 }
 
 // Generates a real Firebase email-link sign-in URL without triggering
-// Firebase's own email send — the link is identical in form to one Firebase
-// would have emailed itself, so the existing client-side
+// Firebase's own email send (returnOobLink is only honored for
+// service-account-authenticated callers) — the link is identical in form to
+// one Firebase would have emailed itself, so the existing client-side
 // isSignInWithEmailLink/signInWithEmailLink flow keeps working unchanged.
 export async function generateEmailSignInLink(email: string, continueUrl: string): Promise<string> {
-  return getAuth(getFirebaseAdminApp()).generateSignInWithEmailLink(email, {
-    url: continueUrl,
-    handleCodeInApp: true,
+  const accessToken = await getGoogleAccessToken();
+
+  const res = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      requestType: 'EMAIL_SIGNIN',
+      email,
+      continueUrl,
+      canHandleCodeInApp: true,
+      returnOobLink: true,
+    }),
   });
+
+  if (!res.ok) {
+    throw new Error(`Failed to generate sign-in link: ${await res.text()}`);
+  }
+
+  const data: any = await res.json();
+  if (!data.oobLink) {
+    throw new Error('Firebase did not return a sign-in link');
+  }
+  return data.oobLink;
 }
