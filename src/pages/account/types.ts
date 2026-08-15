@@ -23,8 +23,20 @@ export interface CustomerOrder {
   paymentMethod: string;
   paymentStatus: string;
   deliveryStatus?: 'pending' | 'delivered' | 'canceled';
+  adminMessage?: string;
   bundleName?: string;
   createdAt: string;
+}
+
+export interface CustomerNotification {
+  id: string;
+  type: 'campaign' | 'order_status';
+  title: string;
+  message: string;
+  orderId?: string;
+  orderStatus?: 'delivered' | 'canceled';
+  createdAt: string;
+  read: boolean;
 }
 
 export const STORE_LABELS: Record<string, string> = {

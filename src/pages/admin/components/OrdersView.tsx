@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, CheckCircle2, XCircle, Send, MapPin, Tag } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, XCircle, Send, MapPin, Tag, X, MessageSquare } from 'lucide-react';
 import { adminFetch, AdminUnauthorizedError } from '../lib/api';
 import { AdminOrder, STORE_LABELS } from '../types';
 import { Panel } from './Panel';
@@ -27,6 +27,9 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
   const [search, setSearch] = useState('');
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [pendingChange, setPendingChange] = useState<{ id: string; status: 'delivered' | 'canceled'; customerName: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [isSubmittingMessage, setIsSubmittingMessage] = useState(false);
 
   const loadOrders = async () => {
     try {
@@ -75,14 +78,27 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
     }
   };
 
-  const handleStatusChange = async (id: string, status: string) => {
+  // Reverting to "pending" needs no explanation, so it submits instantly.
+  // Marking delivered/canceled opens a small modal first so the admin can
+  // optionally attach a note the customer will see on their order.
+  const handleStatusChange = (id: string, status: string) => {
+    if (status === 'delivered' || status === 'canceled') {
+      const order = orders.find((o) => o.id === id);
+      setStatusMessage('');
+      setPendingChange({ id, status, customerName: order?.customerName || 'this customer' });
+      return;
+    }
+    submitStatusChange(id, status);
+  };
+
+  const submitStatusChange = async (id: string, status: string, message?: string) => {
     setUpdatingId(id);
-    // Optimistic update so the dropdown feels instant.
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, deliveryStatus: status as AdminOrder['deliveryStatus'] } : o)));
+    // Optimistic update so it feels instant.
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, deliveryStatus: status as AdminOrder['deliveryStatus'], adminMessage: message ?? o.adminMessage } : o)));
     try {
       await adminFetch(`/api/orders/${id}/status`, {
         method: 'POST',
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, message }),
       });
     } catch (err) {
       if (err instanceof AdminUnauthorizedError) onUnauthorized();
@@ -90,6 +106,15 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const handleConfirmPendingChange = async () => {
+    if (!pendingChange) return;
+    setIsSubmittingMessage(true);
+    await submitStatusChange(pendingChange.id, pendingChange.status, statusMessage.trim());
+    setIsSubmittingMessage(false);
+    setPendingChange(null);
+    setStatusMessage('');
   };
 
   if (isLoading) {
@@ -198,16 +223,23 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
                   )}
                 </td>
                 <td className="py-3 pr-3">
-                  <select
-                    value={o.deliveryStatus || 'pending'}
-                    disabled={updatingId === o.id}
-                    onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                    className={`px-2 py-1 rounded-full text-[10px] font-bold border cursor-pointer focus:outline-none disabled:opacity-50 ${STATUS_STYLES[o.deliveryStatus || 'pending']}`}
-                  >
-                    <option value="pending" className="bg-[#18181B] text-amber-400">Pending</option>
-                    <option value="delivered" className="bg-[#18181B] text-emerald-400">Delivered</option>
-                    <option value="canceled" className="bg-[#18181B] text-red-400">Canceled</option>
-                  </select>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={o.deliveryStatus || 'pending'}
+                      disabled={updatingId === o.id}
+                      onChange={(e) => handleStatusChange(o.id, e.target.value)}
+                      className={`px-2 py-1 rounded-full text-[10px] font-bold border cursor-pointer focus:outline-none disabled:opacity-50 ${STATUS_STYLES[o.deliveryStatus || 'pending']}`}
+                    >
+                      <option value="pending" className="bg-[#18181B] text-amber-400">Pending</option>
+                      <option value="delivered" className="bg-[#18181B] text-emerald-400">Delivered</option>
+                      <option value="canceled" className="bg-[#18181B] text-red-400">Canceled</option>
+                    </select>
+                    {o.adminMessage && (
+                      <span title={o.adminMessage} className="text-slate-500 shrink-0">
+                        <MessageSquare className="w-3 h-3" />
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="py-3 text-slate-500 whitespace-nowrap">
                   <p className="text-slate-400">{new Date(o.createdAt).toLocaleDateString()}</p>
@@ -223,6 +255,57 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
           <p className="text-xs text-slate-500 py-8 text-center">No orders match this view.</p>
         )}
       </div>
+
+      {pendingChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-[#141419] border border-white/10 shadow-2xl p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-white">
+                  Mark as {pendingChange.status === 'delivered' ? 'Delivered' : 'Canceled'}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Optional note for {pendingChange.customerName} — shown in their order history and account notifications.
+                </p>
+              </div>
+              <button
+                onClick={() => { setPendingChange(null); setStatusMessage(''); }}
+                className="p-1 rounded-full text-slate-500 hover:text-white cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <textarea
+              value={statusMessage}
+              onChange={(e) => setStatusMessage(e.target.value)}
+              placeholder={pendingChange.status === 'delivered'
+                ? 'e.g. Delivered to the gate, thank you for your order!'
+                : 'e.g. Out of stock — refund issued via bank transfer.'}
+              rows={3}
+              className="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-[#B24BF3] resize-none"
+            />
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setPendingChange(null); setStatusMessage(''); }}
+                className="flex-1 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmPendingChange}
+                disabled={isSubmittingMessage}
+                className={`flex-1 py-2.5 rounded-full text-white text-xs font-bold cursor-pointer disabled:opacity-60 ${
+                  pendingChange.status === 'delivered' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
+                }`}
+              >
+                {isSubmittingMessage ? 'Saving...' : `Confirm ${pendingChange.status === 'delivered' ? 'Delivered' : 'Canceled'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Panel>
   );
 };

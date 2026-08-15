@@ -85,6 +85,7 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentStatus: 'pending' | 'completed';
   deliveryStatus: 'pending' | 'delivered' | 'canceled';
+  adminMessage?: string;
   bundleName?: string;
   createdAt: string;
   telegramNotified: boolean;

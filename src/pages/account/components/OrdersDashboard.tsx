@@ -80,8 +80,10 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({ user, onSigned
 
       <div className="space-y-3">
         {orders.map((o) => {
-          const status = STATUS_META[o.deliveryStatus || 'pending'];
+          const deliveryStatus = o.deliveryStatus || 'pending';
+          const status = STATUS_META[deliveryStatus];
           const StatusIcon = status.icon;
+          const docButtonLabel = deliveryStatus === 'delivered' ? 'View Receipt' : deliveryStatus === 'canceled' ? 'View Details' : 'View Quotation';
           return (
             <div key={o.id} className="rounded-2xl border border-gray-100 shadow-xs p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
@@ -101,6 +103,17 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({ user, onSigned
                 {o.items.map((it) => `${it.quantity}x ${it.productName}`).join(', ')}
               </p>
 
+              {o.adminMessage && (deliveryStatus === 'delivered' || deliveryStatus === 'canceled') && (
+                <div className={`p-2.5 rounded-lg text-[11px] leading-relaxed border ${
+                  deliveryStatus === 'delivered'
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                    : 'bg-red-50 text-red-900 border-red-200'
+                }`}>
+                  <span className="font-bold">{deliveryStatus === 'delivered' ? '📦 Note: ' : '❌ Note: '}</span>
+                  {o.adminMessage}
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                 <span className="text-sm font-black text-[#B24BF3]">
                   {o.currency === 'SSP' ? `SSP ${(o.totalUSD * 8000).toLocaleString()}` : `$${o.totalUSD}`}
@@ -110,7 +123,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({ user, onSigned
                   className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#B24BF3] cursor-pointer"
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  View Invoice
+                  {docButtonLabel}
                 </button>
               </div>
             </div>

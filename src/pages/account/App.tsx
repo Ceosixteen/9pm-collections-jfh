@@ -6,6 +6,7 @@ import { watchAuthState, isLoginLink, completeLoginWithLink, getPendingEmail } f
 import { LoginScreen } from './components/LoginScreen';
 import { ConfirmEmailScreen } from './components/ConfirmEmailScreen';
 import { OrdersDashboard } from './components/OrdersDashboard';
+import { NotificationsBell } from './components/NotificationsBell';
 
 type Phase = 'checking' | 'needsEmailConfirmation' | 'ready';
 
@@ -70,9 +71,14 @@ export default function App() {
               referrerPolicy="no-referrer"
             />
           </Link>
-          <Link to="/" className="text-xs font-bold text-slate-500 hover:text-[#B24BF3]">
-            ← Back to Shop
-          </Link>
+          <div className="flex items-center gap-2.5">
+            {phase === 'ready' && user && (
+              <NotificationsBell onUnauthorized={() => setUser(null)} />
+            )}
+            <Link to="/" className="text-xs font-bold text-slate-500 hover:text-[#B24BF3]">
+              ← Back to Shop
+            </Link>
+          </div>
         </div>
       </header>
 

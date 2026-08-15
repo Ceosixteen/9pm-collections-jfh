@@ -12,13 +12,17 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
     ? `SSP ${(usd * 8000).toLocaleString()}`
     : `$${usd.toLocaleString()}`);
 
+  const status = order.deliveryStatus || 'pending';
+  const docLabel = status === 'delivered' ? 'RECEIPT' : status === 'canceled' ? 'CANCELED ORDER' : 'QUOTATION';
+  const toolbarLabel = status === 'delivered' ? 'Receipt' : status === 'canceled' ? 'Cancellation Notice' : 'Quotation';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs print:bg-white print:p-0">
       <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white shadow-2xl print:shadow-none print:rounded-none print:max-h-none print:max-w-none">
 
         {/* Toolbar (hidden when printing) */}
         <div className="print:hidden sticky top-0 flex items-center justify-between p-4 border-b border-gray-100 bg-white rounded-t-3xl">
-          <h3 className="text-sm font-black text-slate-900">Invoice #{order.id}</h3>
+          <h3 className="text-sm font-black text-slate-900">{toolbarLabel} #{order.id}</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}
@@ -50,11 +54,24 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
               <p className="text-xs text-slate-500">+211 911 267 703</p>
             </div>
             <div className="text-right">
-              <h2 className="text-xl font-black text-slate-900">INVOICE</h2>
+              <h2 className="text-xl font-black text-slate-900">{docLabel}</h2>
               <p className="text-xs text-slate-500 mt-1">#{order.id}</p>
               <p className="text-xs text-slate-500">{new Date(order.createdAt).toLocaleString()}</p>
             </div>
           </div>
+
+          {order.adminMessage && (status === 'delivered' || status === 'canceled') && (
+            <div className={`p-3.5 rounded-xl text-xs leading-relaxed border ${
+              status === 'delivered'
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                : 'bg-red-50 text-red-900 border-red-200'
+            }`}>
+              <p className="font-bold mb-0.5">
+                {status === 'delivered' ? '📦 A note from our team' : '❌ A note from our team'}
+              </p>
+              <p>{order.adminMessage}</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>

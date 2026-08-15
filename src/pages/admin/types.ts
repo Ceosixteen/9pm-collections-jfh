@@ -19,10 +19,19 @@ export interface AdminOrder {
   paymentMethod: string;
   paymentStatus: string;
   deliveryStatus?: 'pending' | 'delivered' | 'canceled';
+  adminMessage?: string;
   bundleName?: string;
   createdAt: string;
   telegramNotified?: boolean;
   telegramError?: string;
+}
+
+export interface AdminCampaign {
+  id: string;
+  title: string;
+  message: string;
+  audience: 'all';
+  createdAt: string;
 }
 
 export interface AdminClient {

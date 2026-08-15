@@ -8,6 +8,23 @@ import * as hawasCatalog from './catalogs/hawas.js';
 import * as ceraveCatalog from './catalogs/cerave.js';
 import * as badeeAlOudCatalog from './catalogs/badeeAlOud.js';
 
+// In-app notification shown to signed-in customers on /account — either an
+// admin-composed broadcast campaign, or an automatic note tied to one order
+// (e.g. "your order was delivered" / "your order was canceled") along with
+// whatever message the admin attached when changing that order's status.
+interface Notification {
+  id: string;
+  type: 'campaign' | 'order_status';
+  title: string;
+  message: string;
+  audience: 'all' | 'email';
+  targetEmail?: string;
+  orderId?: string;
+  orderStatus?: 'delivered' | 'canceled';
+  createdAt: string;
+  readBy: string[];
+}
+
 interface Catalog {
   label: string;
   perfumesData: readonly { id: string; name: string; priceUSD: number; priceSSP: number }[];
@@ -206,6 +223,14 @@ async function saveOrderToFirestore(order: Order) {
     await setDoc(doc(db, 'orders', order.id), order);
   } catch (err) {
     console.error('Failed to save order to Firestore:', err);
+  }
+}
+
+async function saveNotificationToFirestore(notification: Notification) {
+  try {
+    await setDoc(doc(db, 'notifications', notification.id), notification);
+  } catch (err) {
+    console.error('Failed to save notification to Firestore:', err);
   }
 }
 
@@ -1281,11 +1306,15 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     }
   });
 
-  // POST Update an order's delivery/fulfillment status (admin dashboard)
+  // POST Update an order's delivery/fulfillment status (admin dashboard).
+  // Optionally accepts a `message` the admin wants to attach — e.g. why an
+  // order was canceled, or a delivery note — which is stored on the order
+  // and, for delivered/canceled orders placed with an email on file, also
+  // pushed out as an in-app notification the customer sees on /account.
   app.post('/api/orders/:id/status', requireAdminAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const { status } = req.body || {};
+      const { status, message } = req.body || {};
       const validStatuses = ['pending', 'delivered', 'canceled'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ error: 'Invalid status. Must be one of: pending, delivered, canceled.' });
@@ -1304,9 +1333,137 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       }
 
       targetOrder.deliveryStatus = status;
+      if (typeof message === 'string') {
+        targetOrder.adminMessage = message.trim() || undefined;
+      }
       await saveOrderToFirestore(targetOrder);
 
+      const customerEmail = (targetOrder.customerEmail || '').toLowerCase().trim();
+      if ((status === 'delivered' || status === 'canceled') && customerEmail) {
+        const defaultMessage = status === 'delivered'
+          ? 'Your order has arrived — thank you for shopping with us!'
+          : 'Your order was canceled. Contact us on WhatsApp if you have any questions.';
+        const notification: Notification = {
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          type: 'order_status',
+          title: status === 'delivered' ? `Order #${targetOrder.id} delivered` : `Order #${targetOrder.id} canceled`,
+          message: (typeof message === 'string' && message.trim()) || defaultMessage,
+          audience: 'email',
+          targetEmail: customerEmail,
+          orderId: targetOrder.id,
+          orderStatus: status,
+          createdAt: new Date().toISOString(),
+          readBy: [],
+        };
+        await saveNotificationToFirestore(notification);
+      }
+
       return res.json({ success: true, order: targetOrder });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+  });
+
+  // POST Send a broadcast campaign notification to every signed-in customer
+  // (admin dashboard "Campaigns" tab).
+  app.post('/api/admin/campaigns', requireAdminAuth, async (req, res) => {
+    try {
+      const { title, message } = req.body || {};
+      const trimmedTitle = typeof title === 'string' ? title.trim() : '';
+      const trimmedMessage = typeof message === 'string' ? message.trim() : '';
+      if (!trimmedTitle || !trimmedMessage) {
+        return res.status(400).json({ error: 'A title and message are required' });
+      }
+      const notification: Notification = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'campaign',
+        title: trimmedTitle,
+        message: trimmedMessage,
+        audience: 'all',
+        createdAt: new Date().toISOString(),
+        readBy: [],
+      };
+      await saveNotificationToFirestore(notification);
+      return res.json({ success: true, notification });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+  });
+
+  // GET Campaign send history (admin dashboard).
+  app.get('/api/admin/campaigns', requireAdminAuth, async (req, res) => {
+    try {
+      const q = query(collection(db, 'notifications'), limit(1000));
+      const snapshot = await getDocs(q);
+      const campaigns = snapshot.docs
+        .map((d) => d.data() as Notification)
+        .filter((n) => n.type === 'campaign')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return res.json(campaigns);
+    } catch (err) {
+      console.error('Error fetching campaigns:', err);
+      return res.status(500).json({ error: 'Failed to load campaigns' });
+    }
+  });
+
+  // GET Every notification a signed-in customer should see — broadcast
+  // campaigns plus any order-status notes addressed to their email.
+  app.get('/api/my-notifications', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || '';
+      const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+      const email = await verifyFirebaseIdToken(idToken);
+      if (!email) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const q = query(collection(db, 'notifications'), limit(1000));
+      const snapshot = await getDocs(q);
+      const mine = snapshot.docs
+        .map((d) => d.data() as Notification)
+        .filter((n) => n.audience === 'all' || n.targetEmail === email)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .map((n) => ({
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          message: n.message,
+          orderId: n.orderId,
+          orderStatus: n.orderStatus,
+          createdAt: n.createdAt,
+          read: (n.readBy || []).includes(email),
+        }));
+
+      return res.json(mine);
+    } catch (err) {
+      console.error('Error fetching customer notifications:', err);
+      return res.status(500).json({ error: 'Failed to load notifications' });
+    }
+  });
+
+  // POST Mark every notification currently visible to this customer as read.
+  app.post('/api/my-notifications/mark-all-read', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || '';
+      const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+      const email = await verifyFirebaseIdToken(idToken);
+      if (!email) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const q = query(collection(db, 'notifications'), limit(1000));
+      const snapshot = await getDocs(q);
+      const mine = snapshot.docs
+        .map((d) => d.data() as Notification)
+        .filter((n) => n.audience === 'all' || n.targetEmail === email);
+
+      await Promise.all(
+        mine
+          .filter((n) => !(n.readBy || []).includes(email))
+          .map((n) => saveNotificationToFirestore({ ...n, readBy: [...(n.readBy || []), email] }))
+      );
+
+      return res.json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message || String(err) });
     }
