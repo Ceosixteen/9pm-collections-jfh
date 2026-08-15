@@ -187,8 +187,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-white text-slate-900 flex flex-col shadow-2xl">
+      <div className="absolute inset-y-0 right-0 w-full sm:max-w-md flex sm:pl-10">
+        <div className="w-full bg-white text-slate-900 flex flex-col shadow-2xl">
           
           {/* Cart Header */}
           <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between">
@@ -355,7 +355,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                             : 'text-slate-600 hover:text-slate-900 bg-transparent'
                         }`}
                       >
-                        £ Pay in SSP (8,000 SSP/$)
+                        £ Pay in SSP
                       </button>
                     </div>
                   </div>
