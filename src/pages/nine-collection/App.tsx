@@ -40,6 +40,21 @@ export default function App() {
     trackPageview('nine-collection');
   }, []);
 
+  // If arriving from the homepage product showcase with ?addProduct=id,
+  // auto-add that product to the cart and open the drawer immediately.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get('addProduct');
+    if (!productId) return;
+    const match = PERFUMES_DATA.find((p) => p.id === productId);
+    if (match) {
+      handleAddToCart(match);
+    }
+    // Clean the URL so refreshing doesn't re-add the product.
+    window.history.replaceState({}, '', window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   const handleToggleCurrency = () => {

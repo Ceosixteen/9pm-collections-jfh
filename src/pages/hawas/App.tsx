@@ -40,6 +40,16 @@ export default function App() {
     trackPageview('hawas');
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get('addProduct');
+    if (!productId) return;
+    const match = PERFUMES_DATA.find((p) => p.id === productId);
+    if (match) handleAddToCart(match);
+    window.history.replaceState({}, '', window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   const handleToggleCurrency = () => {
