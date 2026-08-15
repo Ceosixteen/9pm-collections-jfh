@@ -7,6 +7,7 @@ import { OrdersView } from './components/OrdersView';
 import { ClientsView } from './components/ClientsView';
 import { LandingPagesView } from './components/LandingPagesView';
 import { HelpRequestsView } from './components/HelpRequestsView';
+import { LeadsView } from './components/LeadsView';
 
 export default function App() {
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'anonymous'>('checking');
@@ -63,6 +64,7 @@ export default function App() {
     orders: { title: 'Orders', subtitle: 'Every order placed across all landing pages.' },
     clients: { title: 'Clients', subtitle: 'Customers aggregated by phone number, across all collections.' },
     pages: { title: 'Landing Pages', subtitle: 'Sales and traffic broken down per storefront.' },
+    leads: { title: 'Email Leads', subtitle: 'Customers who joined the mailing list for discounts and drops.' },
     help: { title: 'Help Requests', subtitle: 'Customer support queries forwarded by Amina.' },
   };
 
@@ -81,6 +83,7 @@ export default function App() {
           {activeView === 'orders' && <OrdersView onUnauthorized={handleUnauthorized} />}
           {activeView === 'clients' && <ClientsView onUnauthorized={handleUnauthorized} />}
           {activeView === 'pages' && <LandingPagesView onUnauthorized={handleUnauthorized} />}
+          {activeView === 'leads' && <LeadsView onUnauthorized={handleUnauthorized} />}
           {activeView === 'help' && <HelpRequestsView onUnauthorized={handleUnauthorized} />}
         </div>
       </main>

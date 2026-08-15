@@ -1,7 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, Users, Layers, MessageCircleQuestion, LogOut } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Users, Layers, MessageCircleQuestion, Mail, LogOut } from 'lucide-react';
 
-export type AdminView = 'overview' | 'orders' | 'clients' | 'pages' | 'help';
+export type AdminView = 'overview' | 'orders' | 'clients' | 'pages' | 'help' | 'leads';
 
 interface SidebarProps {
   activeView: AdminView;
@@ -14,6 +14,7 @@ const NAV_ITEMS: { id: AdminView; label: string; icon: React.ElementType }[] = [
   { id: 'orders', label: 'Orders', icon: ShoppingBag },
   { id: 'clients', label: 'Clients', icon: Users },
   { id: 'pages', label: 'Landing Pages', icon: Layers },
+  { id: 'leads', label: 'Email Leads', icon: Mail },
   { id: 'help', label: 'Help Requests', icon: MessageCircleQuestion },
 ];
 

@@ -67,6 +67,14 @@ export interface PageviewsSummaryResponse {
   byDay: Record<string, number>;
 }
 
+export interface AdminLead {
+  id: string;
+  email: string;
+  source: string;
+  storeSlug: string;
+  createdAt: string;
+}
+
 export const STORE_LABELS: Record<string, string> = {
   home: 'Homepage',
   'nine-collection': 'The 9 Collection',

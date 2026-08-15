@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, ShoppingBag, Trash2, Plus, Minus, Sparkles, Send, PhoneCall } from 'lucide-react';
 import { CartItem, Currency, PaymentMethod, Order } from '../types';
+import { CheckoutSignIn, CheckoutAutofillData } from '../../../components/CheckoutSignIn';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -58,6 +59,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     return paymentCurrency === 'SSP'
       ? `SSP ${(usdVal * 8000).toLocaleString()}`
       : `$${usdVal.toLocaleString()}`;
+  };
+
+  const handleAutofill = (data: CheckoutAutofillData) => {
+    setCustomerEmail((prev) => prev || data.email);
+    if (data.name) setCustomerName((prev) => prev || data.name);
+    if (data.phone) setCustomerPhone((prev) => prev || data.phone);
+    if (data.address) setDeliveryAddress((prev) => prev || data.address);
+    if (data.city) setDeliveryCity((prev) => (prev && prev !== 'Juba' ? prev : (data.city as string)));
   };
 
   const handleCurrencyChange = (newCurrency: Currency) => {
@@ -310,6 +319,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <h3 className="text-xs font-extrabold uppercase text-[#B24BF3] tracking-wider">
                   Juba Delivery & Customer Information
                 </h3>
+
+                <CheckoutSignIn onAutofill={handleAutofill} />
 
                 {orderError && (
                   <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">

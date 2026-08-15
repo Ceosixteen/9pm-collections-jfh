@@ -19,4 +19,5 @@ const app = initializeApp({
 });
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+export const firebaseWebApiKey: string = firebaseConfig.apiKey;
 export { collection, doc, setDoc, getDocs, query, orderBy, limit };

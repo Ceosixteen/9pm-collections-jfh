@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, ShieldCheck, Truck } from 'lucide-react';
+import { Phone, ShieldCheck, Truck, User } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const collections = [
@@ -51,12 +51,21 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        <a
-          href="tel:+211911267703"
-          className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-[#18181B] text-white text-[11px] sm:text-xs font-bold hover:bg-slate-800 transition-all shadow-xs"
-        >
-          Call Us
-        </a>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <Link
+            to="/account"
+            aria-label="My Account"
+            className="p-1.5 sm:p-2 rounded-full bg-white text-slate-700 border border-gray-200 hover:border-[#B24BF3] hover:text-[#B24BF3] transition-all shadow-xs"
+          >
+            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </Link>
+          <a
+            href="tel:+211911267703"
+            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-[#18181B] text-white text-[11px] sm:text-xs font-bold hover:bg-slate-800 transition-all shadow-xs"
+          >
+            Call Us
+          </a>
+        </div>
       </div>
 
       {/* Collections Navigation Strip */}

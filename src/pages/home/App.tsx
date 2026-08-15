@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { MarqueeBanner } from './components/MarqueeBanner';
 import { CollectionsGrid } from './components/CollectionsGrid';
+import { EmailCapture } from './components/EmailCapture';
 import { Footer } from './components/Footer';
 import { RecentOrdersToast } from './components/RecentOrdersToast';
 import { trackPageview } from '../../lib/trackPageview';
@@ -18,6 +19,7 @@ export default function App() {
       <Hero />
       <MarqueeBanner />
       <CollectionsGrid />
+      <EmailCapture />
       <Footer />
       <RecentOrdersToast />
     </div>

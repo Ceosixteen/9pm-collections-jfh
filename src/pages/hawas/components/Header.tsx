@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Diamond } from 'lucide-react';
+import { ShoppingBag, Diamond, User } from 'lucide-react';
 import { Currency } from '../types';
 
 interface HeaderProps {
@@ -96,6 +96,15 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <span className="hidden xs:inline">Find My Scent</span>
           </button>
+
+          {/* My Account Link */}
+          <Link
+            to="/account"
+            aria-label="My Account"
+            className="p-1.5 sm:p-2 rounded-full bg-white text-slate-700 border border-gray-200 hover:border-[#B24BF3] hover:text-[#B24BF3] transition-all shadow-xs"
+          >
+            <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </Link>
 
           {/* Cart Button */}
           <button

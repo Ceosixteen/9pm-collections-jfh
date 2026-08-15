@@ -5,6 +5,7 @@ import HawasApp from './pages/hawas/App';
 import CeraveApp from './pages/cerave/App';
 import BadeeAlOudApp from './pages/badee-al-oud/App';
 import AdminApp from './pages/admin/App';
+import AccountApp from './pages/account/App';
 
 export default function App() {
   // The admin back office is served from its own subdomain
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/collections/hawas" element={<HawasApp />} />
       <Route path="/collections/cerave" element={<CeraveApp />} />
       <Route path="/collections/badee-al-oud" element={<BadeeAlOudApp />} />
+      <Route path="/account" element={<AccountApp />} />
     </Routes>
   );
 }

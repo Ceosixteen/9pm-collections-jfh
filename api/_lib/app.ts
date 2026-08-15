@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
-import { db, setDoc, doc, collection, getDocs, query, orderBy, limit } from '../../src/lib/firebase.js';
+import { db, setDoc, doc, collection, getDocs, query, orderBy, limit, firebaseWebApiKey } from '../../src/lib/firebase.js';
 import * as nineCollectionCatalog from './catalogs/nineCollection.js';
 import * as hawasCatalog from './catalogs/hawas.js';
 import * as ceraveCatalog from './catalogs/cerave.js';
@@ -177,6 +177,27 @@ function inferRecommendedProductId(
     }
   }
   return undefined;
+}
+
+// Verifies a Firebase Auth ID token via the accounts:lookup REST endpoint,
+// using only the public Web API key (already in firebase-applet-config.json)
+// — no service account / Firebase Admin SDK credentials needed. Returns the
+// verified email on success, or null if the token is missing/invalid.
+async function verifyFirebaseIdToken(idToken: string | undefined): Promise<string | null> {
+  if (!idToken) return null;
+  try {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseWebApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const email = data?.users?.[0]?.email;
+    return typeof email === 'string' ? email.toLowerCase() : null;
+  } catch {
+    return null;
+  }
 }
 
 // Firestore Persistence Helpers
@@ -736,6 +757,45 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     }
   });
 
+  // POST Email capture (homepage newsletter signup). Public — no auth needed
+  // to submit an email, matching how /api/track-pageview works.
+  app.post('/api/leads', async (req, res) => {
+    try {
+      const { email, source, storeSlug } = req.body || {};
+      const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+      if (!trimmedEmail || !trimmedEmail.includes('@')) {
+        return res.status(400).json({ error: 'A valid email is required' });
+      }
+      const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      await setDoc(doc(db, 'leads', id), {
+        id,
+        email: trimmedEmail,
+        source: source || 'homepage',
+        storeSlug: storeSlug || 'home',
+        createdAt: new Date().toISOString(),
+      });
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('Failed to record lead:', err);
+      return res.status(500).json({ success: false });
+    }
+  });
+
+  // GET Captured leads (admin dashboard)
+  app.get('/api/admin/leads', requireAdminAuth, async (req, res) => {
+    try {
+      const q = query(collection(db, 'leads'), limit(1000));
+      const snapshot = await getDocs(q);
+      const leads = snapshot.docs
+        .map((d) => d.data())
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return res.json(leads);
+    } catch (err) {
+      console.error('Error fetching leads:', err);
+      return res.status(500).json({ error: 'Failed to load leads' });
+    }
+  });
+
   // Telegram Webhook Handler for Incoming Client Messages
   app.post('/api/telegram/webhook', async (req, res) => {
     try {
@@ -922,6 +982,42 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (err) {
       console.error('Error fetching orders from Firestore:', err);
       return res.json(ordersStore);
+    }
+  });
+
+  // GET a signed-in customer's own orders across every collection. Auth is a
+  // Firebase ID token (from the email-link sign-in flow) in the Authorization
+  // header, verified via verifyFirebaseIdToken — this is a customer's own
+  // account, not the admin dashboard, so it uses a different auth mechanism
+  // than requireAdminAuth.
+  app.get('/api/my-orders', async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization || '';
+      const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+      const email = await verifyFirebaseIdToken(idToken);
+
+      if (!email) {
+        return res.status(401).json({ error: 'Sign in required' });
+      }
+
+      const q = query(collection(db, 'orders'), limit(1000));
+      const snapshot = await getDocs(q);
+      const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+
+      const orderMap = new Map<string, Order>();
+      firestoreOrders.forEach((o) => orderMap.set(o.id, o));
+      ordersStore.forEach((o) => {
+        if (!orderMap.has(o.id)) orderMap.set(o.id, o);
+      });
+
+      const myOrders = Array.from(orderMap.values())
+        .filter((o) => (o.customerEmail || '').toLowerCase() === email)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      return res.json(myOrders);
+    } catch (err) {
+      console.error('Error fetching customer orders:', err);
+      return res.status(500).json({ error: 'Failed to load your orders' });
     }
   });
 
