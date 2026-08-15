@@ -219,6 +219,31 @@ async function verifyFirebaseIdToken(idToken: string | undefined): Promise<strin
   }
 }
 
+// Base64 of the small email-specific logo, fetched once per cold start and
+// cached — used as a CID inline attachment on outgoing emails so the logo
+// renders immediately instead of depending on the recipient's email client
+// loading a remote image. Fetched over HTTP from the already-public static
+// asset rather than read from disk, since the serverless function's bundle
+// isn't guaranteed to include files under public/ (those are traced into
+// dist/ for static serving, not necessarily into the function's filesystem).
+let cachedLogoBase64Promise: Promise<string | null> | null = null;
+async function getEmailLogoBase64(): Promise<string | null> {
+  if (!cachedLogoBase64Promise) {
+    cachedLogoBase64Promise = (async () => {
+      try {
+        const res = await fetch('https://jubafashionhub.link/images/juba_fashion_hub_logo_email.jpg');
+        if (!res.ok) throw new Error(`Logo fetch returned ${res.status}`);
+        const buf = Buffer.from(await res.arrayBuffer());
+        return buf.toString('base64');
+      } catch (err) {
+        console.error('Failed to load email logo attachment:', err);
+        return null;
+      }
+    })();
+  }
+  return cachedLogoBase64Promise;
+}
+
 // Firestore Persistence Helpers
 async function saveOrderToFirestore(order: Order) {
   try {
@@ -808,6 +833,8 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         return res.status(500).json({ error: 'Email sending is not configured yet. Please try again later.' });
       }
 
+      const logoBase64 = await getEmailLogoBase64();
+
       const resendRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -819,6 +846,9 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
           to: [trimmedEmail],
           subject: 'Your Juba Fashion Hub sign-in link',
           html: buildSignInEmailHtml(link),
+          attachments: logoBase64
+            ? [{ filename: 'logo.jpg', content: logoBase64, content_id: 'logo' }]
+            : undefined,
         }),
       });
 

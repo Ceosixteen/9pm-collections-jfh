@@ -3,7 +3,11 @@
 // CSS sanitizers (Gmail, Outlook, etc. strip <style> blocks unpredictably).
 
 const BRAND_PURPLE = '#B24BF3';
-const LOGO_URL = 'https://jubafashionhub.link/images/juba_fashion_hub_logo.jpg';
+// Embedded as a CID inline attachment (see sendBrandedEmail in app.ts)
+// rather than linked as a remote URL — that way the logo renders
+// immediately in every client, even ones that block remote images by
+// default until the user clicks "show images".
+const LOGO_CID = 'cid:logo';
 
 function wrapEmailShell(previewText: string, bodyHtml: string): string {
   return `<!DOCTYPE html>
@@ -21,7 +25,7 @@ function wrapEmailShell(previewText: string, bodyHtml: string): string {
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px; width:100%; background-color:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
             <tr>
               <td style="padding:28px 32px 0 32px;">
-                <img src="${LOGO_URL}" alt="Juba Fashion Hub" width="48" height="48" style="border-radius:10px; display:block;" />
+                <img src="${LOGO_CID}" alt="Juba Fashion Hub" width="48" height="48" style="border-radius:10px; display:block;" />
               </td>
             </tr>
             <tr>
