@@ -6,7 +6,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
-  sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
   onAuthStateChanged,
@@ -31,12 +30,21 @@ export const auth = getAuth(app);
 // ask them to re-type it.
 const PENDING_EMAIL_KEY = 'jfh_pending_signin_email';
 
+// Sent via our own backend (Admin SDK + Resend) instead of Firebase's
+// built-in mailer, so the email is fully branded and lands from our own
+// verified domain instead of Firebase's generic shared sending domain.
 export async function sendLoginLink(email: string, redirectPath: string): Promise<void> {
-  const actionCodeSettings = {
-    url: `${window.location.origin}${redirectPath}`,
-    handleCodeInApp: true,
-  };
-  await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+  const res = await fetch('/api/auth/send-login-link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, redirectPath }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const err = new Error(data?.error || 'Failed to send sign-in link') as Error & { code?: string };
+    err.code = data?.code;
+    throw err;
+  }
   window.localStorage.setItem(PENDING_EMAIL_KEY, email);
 }
 

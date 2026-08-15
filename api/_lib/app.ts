@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
 import { db, setDoc, doc, collection, getDocs, query, orderBy, limit, firebaseWebApiKey } from '../../src/lib/firebase.js';
+import { generateEmailSignInLink } from './firebaseAdmin.js';
+import { buildSignInEmailHtml } from './emailTemplates.js';
 import * as nineCollectionCatalog from './catalogs/nineCollection.js';
 import * as hawasCatalog from './catalogs/hawas.js';
 import * as ceraveCatalog from './catalogs/cerave.js';
@@ -779,6 +781,57 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (err) {
       console.error('Failed to record pageview:', err);
       return res.json({ success: false });
+    }
+  });
+
+  // POST Send a passwordless sign-in link, emailed by us (via Resend) with
+  // full Juba Fashion Hub branding, instead of Firebase's own generic mail.
+  // We generate the link via the Admin SDK (no email sent by Firebase
+  // itself) and send it ourselves — the link is otherwise identical to one
+  // Firebase would have emailed, so the client-side
+  // isSignInWithEmailLink/signInWithEmailLink flow is unaffected.
+  app.post('/api/auth/send-login-link', async (req, res) => {
+    try {
+      const { email, redirectPath } = req.body || {};
+      const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+      if (!trimmedEmail || !trimmedEmail.includes('@')) {
+        return res.status(400).json({ error: 'A valid email is required' });
+      }
+      const safePath = typeof redirectPath === 'string' && redirectPath.startsWith('/') ? redirectPath : '/account';
+      const continueUrl = `${req.protocol}://${req.get('host')}${safePath}`;
+
+      const link = await generateEmailSignInLink(trimmedEmail, continueUrl);
+
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (!resendApiKey) {
+        console.error('RESEND_API_KEY is not configured');
+        return res.status(500).json({ error: 'Email sending is not configured yet. Please try again later.' });
+      }
+
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${resendApiKey}`,
+        },
+        body: JSON.stringify({
+          from: 'Juba Fashion Hub <sign-in@jubafashionhub.link>',
+          to: [trimmedEmail],
+          subject: 'Your Juba Fashion Hub sign-in link',
+          html: buildSignInEmailHtml(link),
+        }),
+      });
+
+      if (!resendRes.ok) {
+        const errText = await resendRes.text();
+        console.error('Resend send failed:', errText);
+        return res.status(502).json({ error: 'Could not send the sign-in email. Please try again shortly.' });
+      }
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('send-login-link error:', err);
+      return res.status(500).json({ error: err.message || 'Failed to send sign-in link', code: err.code });
     }
   });
 

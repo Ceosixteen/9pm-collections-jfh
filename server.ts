@@ -1,3 +1,4 @@
+import './loadEnv.js';
 import path from 'path';
 import { existsSync } from 'fs';
 import express from 'express';
