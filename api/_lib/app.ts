@@ -349,16 +349,37 @@ async function getEmailLogoBase64(): Promise<string | null> {
 }
 
 // Firestore Persistence Helpers
+
+// Firestore rejects any document containing an `undefined` value, failing the
+// whole write. Optional fields on our types (e.g. an order with no bundle, or
+// no telegramError) are naturally undefined, so they must be stripped rather
+// than sent. This was the cause of orders silently vanishing: every non-bundle
+// order carried `bundleName: undefined` and was rejected.
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefined(item)) as unknown as T;
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      if (val !== undefined) out[key] = stripUndefined(val);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 // Saves an order to Firestore with up to 3 retries before giving up.
 // Unlike the old silent-catch version, this throws on persistent failure so
 // the caller (the order endpoint) can return a real error to the customer
 // rather than falsely confirming an order that was never persisted.
 async function saveOrderToFirestore(order: Order) {
   const MAX_RETRIES = 3;
+  const payload = stripUndefined(order);
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      await setDoc(doc(db, 'orders', order.id), order);
+      await setDoc(doc(db, 'orders', order.id), payload);
       return; // success
     } catch (err) {
       lastErr = err;
@@ -373,7 +394,7 @@ async function saveOrderToFirestore(order: Order) {
 
 async function saveNotificationToFirestore(notification: Notification) {
   try {
-    await setDoc(doc(db, 'notifications', notification.id), notification);
+    await setDoc(doc(db, 'notifications', notification.id), stripUndefined(notification));
   } catch (err) {
     console.error('Failed to save notification to Firestore:', err);
   }
