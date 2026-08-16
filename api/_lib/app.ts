@@ -1402,9 +1402,15 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         allOrders = ordersStore;
       }
 
+      // Revenue counts ONLY delivered orders — money is real once the rider
+      // has handed the goods over and been paid. Pending orders may still be
+      // canceled, so counting them would overstate earnings.
+      const isDelivered = (o: Order) => o.deliveryStatus === 'delivered';
+
       const byStore: Record<string, {
         label: string;
         orderCount: number;
+        deliveredCount: number;
         revenueUSD: number;
         revenueSSP: number;
         products: Record<string, { productName: string; quantity: number }>;
@@ -1416,6 +1422,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
           byStore[slug] = {
             label: CATALOGS[slug]?.label || slug,
             orderCount: 0,
+            deliveredCount: 0,
             revenueUSD: 0,
             revenueSSP: 0,
             products: {},
@@ -1423,15 +1430,21 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         }
         const entry = byStore[slug];
         entry.orderCount += 1;
-        entry.revenueUSD += order.totalUSD || 0;
-        entry.revenueSSP += order.totalSSP || 0;
 
-        (order.items || []).forEach((item) => {
-          if (!entry.products[item.productId]) {
-            entry.products[item.productId] = { productName: item.productName, quantity: 0 };
-          }
-          entry.products[item.productId].quantity += item.quantity || 0;
-        });
+        if (isDelivered(order)) {
+          entry.deliveredCount += 1;
+          entry.revenueUSD += order.totalUSD || 0;
+          entry.revenueSSP += order.totalSSP || 0;
+
+          // Top products reflect actually-sold units, so they follow the same
+          // delivered-only rule as revenue.
+          (order.items || []).forEach((item) => {
+            if (!entry.products[item.productId]) {
+              entry.products[item.productId] = { productName: item.productName, quantity: 0 };
+            }
+            entry.products[item.productId].quantity += item.quantity || 0;
+          });
+        }
       }
 
       const result = Object.fromEntries(
@@ -1440,6 +1453,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
           {
             label: entry.label,
             orderCount: entry.orderCount,
+            deliveredCount: entry.deliveredCount,
             revenueUSD: entry.revenueUSD,
             revenueSSP: entry.revenueSSP,
             topProducts: Object.values(entry.products)
@@ -1450,9 +1464,19 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       );
 
       const totalOrders = allOrders.length;
-      const totalRevenueUSD = allOrders.reduce((sum, o) => sum + (o.totalUSD || 0), 0);
+      const deliveredOrders = allOrders.filter(isDelivered);
+      const totalRevenueUSD = deliveredOrders.reduce((sum, o) => sum + (o.totalUSD || 0), 0);
+      const pendingRevenueUSD = allOrders
+        .filter((o) => (o.deliveryStatus || 'pending') === 'pending')
+        .reduce((sum, o) => sum + (o.totalUSD || 0), 0);
 
-      return res.json({ byStore: result, totalOrders, totalRevenueUSD });
+      return res.json({
+        byStore: result,
+        totalOrders,
+        deliveredCount: deliveredOrders.length,
+        totalRevenueUSD,
+        pendingRevenueUSD,
+      });
     } catch (err: any) {
       console.error('Error building sales-by-page report:', err);
       return res.status(500).json({ error: 'Failed to build sales report', details: err?.message });
@@ -1648,6 +1672,23 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
   // order was canceled, or a delivery note — which is stored on the order
   // and, for delivered/canceled orders placed with an email on file, also
   // pushed out as an in-app notification the customer sees on /account.
+  // DELETE Permanently remove an order (admin dashboard). Used to clear out
+  // test orders and mistaken duplicates.
+  app.delete('/api/orders/:id', requireAdminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await deleteDoc(doc(db, 'orders', id));
+      // Also drop it from the in-memory store so it doesn't reappear in the
+      // merged list until the serverless instance recycles.
+      const idx = ordersStore.findIndex((o) => o.id === id);
+      if (idx !== -1) ordersStore.splice(idx, 1);
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      return res.status(500).json({ error: err.message || 'Failed to delete order' });
+    }
+  });
+
   app.post('/api/orders/:id/status', requireAdminAuth, async (req, res) => {
     try {
       const { id } = req.params;

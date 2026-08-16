@@ -67,14 +67,20 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ onUnauthorized }) =>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={DollarSign}
-          label="Total Revenue"
+          label="Confirmed Revenue"
           value={`$${(sales?.totalRevenueUSD || 0).toLocaleString()}`}
+          subtext={
+            sales?.pendingRevenueUSD
+              ? `$${sales.pendingRevenueUSD.toLocaleString()} still pending delivery`
+              : 'Delivered orders only'
+          }
           accent="emerald"
         />
         <StatCard
           icon={ShoppingBag}
           label="Total Orders"
           value={(sales?.totalOrders || 0).toLocaleString()}
+          subtext={`${(sales?.deliveredCount || 0).toLocaleString()} delivered`}
           accent="purple"
         />
         <StatCard
@@ -94,7 +100,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({ onUnauthorized }) =>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel title="Revenue by Landing Page" subtitle="All-time, USD">
+        <Panel title="Revenue by Landing Page" subtitle="Delivered orders only, USD">
           <BarChart rows={revenueRows} />
         </Panel>
         <Panel title="Traffic by Landing Page" subtitle="Page views since tracking went live">

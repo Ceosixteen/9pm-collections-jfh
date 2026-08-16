@@ -91,6 +91,7 @@ export interface AdminHelpRequest {
 export interface SalesByPageEntry {
   label: string;
   orderCount: number;
+  deliveredCount: number;
   revenueUSD: number;
   revenueSSP: number;
   topProducts: { productName: string; quantity: number }[];
@@ -99,7 +100,11 @@ export interface SalesByPageEntry {
 export interface SalesByPageResponse {
   byStore: Record<string, SalesByPageEntry>;
   totalOrders: number;
+  deliveredCount: number;
+  /** Revenue from delivered orders only — money actually collected. */
   totalRevenueUSD: number;
+  /** Value of orders still awaiting delivery, shown as context. */
+  pendingRevenueUSD: number;
 }
 
 export interface PageviewsSummaryResponse {

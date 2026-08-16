@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, CheckCircle2, XCircle, Send, MapPin, Tag, X, MessageSquare } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, XCircle, Send, MapPin, Tag, X, MessageSquare, Trash2 } from 'lucide-react';
 import { adminFetch, AdminUnauthorizedError } from '../lib/api';
 import { AdminOrder, STORE_LABELS } from '../types';
 import { Panel } from './Panel';
@@ -27,6 +27,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
   const [search, setSearch] = useState('');
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingChange, setPendingChange] = useState<{ id: string; status: 'delivered' | 'canceled'; customerName: string } | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [isSubmittingMessage, setIsSubmittingMessage] = useState(false);
@@ -108,6 +109,26 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
     }
   };
 
+  const handleDelete = async (order: AdminOrder) => {
+    const confirmed = window.confirm(
+      `Permanently delete order #${order.id} from ${order.customerName}?\n\n` +
+      `This removes it from the dashboard and reports, and cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(order.id);
+    // Optimistic removal so the table updates instantly.
+    setOrders((prev) => prev.filter((o) => o.id !== order.id));
+    try {
+      await adminFetch(`/api/orders/${order.id}`, { method: 'DELETE' });
+    } catch (err) {
+      if (err instanceof AdminUnauthorizedError) onUnauthorized();
+      await loadOrders(); // restore server truth if the delete failed
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleConfirmPendingChange = async () => {
     if (!pendingChange) return;
     setIsSubmittingMessage(true);
@@ -166,7 +187,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
               <th className="pb-2.5 font-bold pr-3">Total</th>
               <th className="pb-2.5 font-bold pr-3">Telegram</th>
               <th className="pb-2.5 font-bold pr-3">Status</th>
-              <th className="pb-2.5 font-bold">Placed</th>
+              <th className="pb-2.5 font-bold pr-3">Placed</th>
+              <th className="pb-2.5 font-bold text-right">Delete</th>
             </tr>
           </thead>
           <tbody>
@@ -241,11 +263,23 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ onUnauthorized }) => {
                     )}
                   </div>
                 </td>
-                <td className="py-3 text-slate-500 whitespace-nowrap">
+                <td className="py-3 pr-3 text-slate-500 whitespace-nowrap">
                   <p className="text-slate-400">{new Date(o.createdAt).toLocaleDateString()}</p>
                   <p className="text-[10px] text-slate-600">
                     {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
+                </td>
+                <td className="py-3 text-right">
+                  <button
+                    onClick={() => handleDelete(o)}
+                    disabled={deletingId === o.id}
+                    title="Delete this order permanently"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {deletingId === o.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Trash2 className="w-3.5 h-3.5" />}
+                  </button>
                 </td>
               </tr>
             ))}
