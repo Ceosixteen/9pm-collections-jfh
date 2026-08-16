@@ -752,6 +752,15 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         telegramNotified: false,
       };
 
+      // 1. Persist to Firestore FIRST (with retry). If all retries fail, a
+      //    real error is thrown and the customer is told to try again — we
+      //    never confirm an order that wasn't saved.
+      await saveOrderToFirestore(newOrder);
+      ordersStore.unshift(newOrder);
+
+      // 2. ONLY AFTER the order is safely in the database, notify via Telegram.
+      //    This ensures: if Firestore fails → no Telegram (no false alarm).
+      //    If Telegram fails → order is still safely persisted.
       let telegramNotified = false;
       let telegramError = undefined;
 
@@ -785,14 +794,15 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         }
       }
 
+      // Update the persisted order with the Telegram notification status.
       newOrder.telegramNotified = telegramNotified;
       if (telegramError) newOrder.telegramError = telegramError;
-
-      // Save to Firestore FIRST (with retry). If this fails after all retries,
-      // return a real error — never confirm an order that wasn't persisted.
-      await saveOrderToFirestore(newOrder);
-      // Only add to in-memory store after Firestore confirms persistence.
-      ordersStore.unshift(newOrder);
+      if (telegramNotified || telegramError) {
+        // Best-effort re-save with notification status — failure here is non-critical.
+        saveOrderToFirestore(newOrder).catch((err) =>
+          console.error('Failed to update telegramNotified status:', err)
+        );
+      }
 
       return res.json({
         success: true,
