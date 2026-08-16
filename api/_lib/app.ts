@@ -245,12 +245,26 @@ async function getEmailLogoBase64(): Promise<string | null> {
 }
 
 // Firestore Persistence Helpers
+// Saves an order to Firestore with up to 3 retries before giving up.
+// Unlike the old silent-catch version, this throws on persistent failure so
+// the caller (the order endpoint) can return a real error to the customer
+// rather than falsely confirming an order that was never persisted.
 async function saveOrderToFirestore(order: Order) {
-  try {
-    await setDoc(doc(db, 'orders', order.id), order);
-  } catch (err) {
-    console.error('Failed to save order to Firestore:', err);
+  const MAX_RETRIES = 3;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await setDoc(doc(db, 'orders', order.id), order);
+      return; // success
+    } catch (err) {
+      lastErr = err;
+      console.error(`saveOrderToFirestore attempt ${attempt}/${MAX_RETRIES} failed:`, err);
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, attempt * 500)); // 500ms, 1000ms back-off
+      }
+    }
   }
+  throw lastErr; // propagate so the caller knows the save truly failed
 }
 
 async function saveNotificationToFirestore(notification: Notification) {
@@ -774,8 +788,11 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       newOrder.telegramNotified = telegramNotified;
       if (telegramError) newOrder.telegramError = telegramError;
 
-      ordersStore.unshift(newOrder);
+      // Save to Firestore FIRST (with retry). If this fails after all retries,
+      // return a real error — never confirm an order that wasn't persisted.
       await saveOrderToFirestore(newOrder);
+      // Only add to in-memory store after Firestore confirms persistence.
+      ordersStore.unshift(newOrder);
 
       return res.json({
         success: true,
@@ -784,7 +801,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       });
     } catch (error: any) {
       console.error('Order Submission Error:', error);
-      return res.status(500).json({ error: 'Failed to process order', details: error.message });
+      return res.status(500).json({ error: 'Failed to process order. Please try again or contact us on WhatsApp.', details: error.message });
     }
   });
 
