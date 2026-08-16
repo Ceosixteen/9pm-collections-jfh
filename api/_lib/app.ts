@@ -131,6 +131,137 @@ function normalizeProduct(raw: any): StoredProduct {
   };
 }
 
+// --- Collections (Firestore-backed landing pages) --------------------------
+// A collection is everything that makes a landing page distinct — hero copy,
+// catalogue copy, bundle copy, and the "find your match" quiz — captured as
+// data instead of a hand-built page. The 4 existing storefronts (9pm, hawas,
+// cerave, badee-al-oud) were audited component-by-component: every one of
+// their 13 shared components is structurally IDENTICAL across all 4, and
+// every difference is copy, labels, or a handful of hardcoded product IDs.
+// That's what this schema captures, so ONE template component can render any
+// collection — existing or newly created via admin/AI — from this record.
+interface QuizOption {
+  value: string;
+  emoji: string;
+  label: string;
+  description: string;
+}
+interface QuizQuestion {
+  text: string;
+  options: QuizOption[];
+}
+interface DeliveryStep {
+  title: string;
+  desc: string;
+}
+interface StoredCollection {
+  id: string; // internal key — matches products.collectionSlug and orders.storeSlug
+  routeSlug: string; // URL segment: /collections/{routeSlug}
+  label: string;
+  category: string; // 'fragrance' | 'skincare' | free text — informs sensible defaults only
+  unitNounSingular: string; // 'bottle'
+  unitNounPlural: string; // 'bottles'
+  detailsLabel: string; // 'Notes' | 'Details'
+  navCategoryLabel: string;
+  heroCategory: string;
+  heroTitleMain: string;
+  heroTitleAccent: string;
+  heroDescription: string;
+  heroCtaLabel: string;
+  heroFinderCtaLabel: string;
+  catalogTag: string;
+  catalogTitle: string;
+  catalogDescription: string;
+  catalogAllLabel: string;
+  bundleTitle: string;
+  bundleMaxSavingsUSD: number;
+  bundleUnitLabel: string; // 'BOTTLES' | 'PRODUCTS'
+  deliverySteps: DeliveryStep[];
+  quizTitle: string;
+  quizSubtitle: string;
+  quizDescription: string;
+  quizQ1: QuizQuestion;
+  quizQ2: QuizQuestion;
+  quizResultMap: Record<string, string>; // option value -> product id
+  quizDefaultProductId: string;
+  isActive: boolean;
+  sortOrder: number;
+  updatedAt: string;
+}
+
+function normalizeCollection(raw: any): StoredCollection {
+  const str = (v: any, fallback = ''): string => (typeof v === 'string' ? v.trim() : fallback);
+  const num = (v: any, fallback = 0): number => {
+    const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const bool = (v: any, fallback = true): boolean => {
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'string') return ['true', 'yes', '1', 'y'].includes(v.trim().toLowerCase());
+    return fallback;
+  };
+  const steps = (v: any): DeliveryStep[] =>
+    Array.isArray(v) && v.length
+      ? v.map((s: any) => ({ title: str(s?.title), desc: str(s?.desc) }))
+      : [
+          { title: '1. Select Your Products', desc: 'Choose what you need from the collection.' },
+          { title: '2. Juba Address & Readiness', desc: 'Provide your phone number & address in Juba. Please only order if you are ready to receive your delivery TODAY!' },
+          { title: '3. Free 120-Min Delivery & Pay', desc: 'Delivered FREE across Juba in under 120 minutes! Pay cash (USD/SSP) on delivery, or bank transfer.' },
+        ];
+  const question = (v: any): QuizQuestion => ({
+    text: str(v?.text, 'What are you looking for?'),
+    options: Array.isArray(v?.options)
+      ? v.options.map((o: any) => ({ value: str(o?.value), emoji: str(o?.emoji, '✨'), label: str(o?.label), description: str(o?.description) }))
+      : [],
+  });
+  const resultMap = (v: any): Record<string, string> => {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const out: Record<string, string> = {};
+      for (const [k, val] of Object.entries(v)) out[k] = String(val);
+      return out;
+    }
+    return {};
+  };
+
+  const id = str(raw?.id) || slugifyId(str(raw?.label));
+  const label = str(raw?.label);
+
+  return {
+    id,
+    routeSlug: str(raw?.routeSlug) || slugifyId(label),
+    label,
+    category: str(raw?.category, 'fragrance'),
+    unitNounSingular: str(raw?.unitNounSingular, 'bottle'),
+    unitNounPlural: str(raw?.unitNounPlural, 'bottles'),
+    detailsLabel: str(raw?.detailsLabel, 'Notes'),
+    navCategoryLabel: str(raw?.navCategoryLabel, label),
+    heroCategory: str(raw?.heroCategory, label.toUpperCase()),
+    heroTitleMain: str(raw?.heroTitleMain, `${label},`),
+    heroTitleAccent: str(raw?.heroTitleAccent, 'delivered fast across Juba.'),
+    heroDescription: str(raw?.heroDescription, `Explore the ${label}. 100% original imports delivered fast across Juba.`),
+    heroCtaLabel: str(raw?.heroCtaLabel, `Shop ${label}`),
+    heroFinderCtaLabel: str(raw?.heroFinderCtaLabel, 'Find My Match'),
+    catalogTag: str(raw?.catalogTag, 'FEATURED CATALOG'),
+    catalogTitle: str(raw?.catalogTitle, `Trending in ${label}`),
+    catalogDescription: str(raw?.catalogDescription, `Handpicked best-sellers. 100% original import, guaranteed.`),
+    catalogAllLabel: str(raw?.catalogAllLabel, 'All Products'),
+    bundleTitle: str(raw?.bundleTitle, 'Special Bundle Deals'),
+    bundleMaxSavingsUSD: num(raw?.bundleMaxSavingsUSD, 25),
+    bundleUnitLabel: str(raw?.bundleUnitLabel, 'PRODUCTS'),
+    deliverySteps: steps(raw?.deliverySteps),
+    quizTitle: str(raw?.quizTitle, 'Find Your Match'),
+    quizSubtitle: str(raw?.quizSubtitle, 'QUICK FINDER QUIZ'),
+    quizDescription: str(raw?.quizDescription, 'Answer 2 quick questions to discover your ideal match in Juba.'),
+    quizQ1: question(raw?.quizQ1),
+    quizQ2: question(raw?.quizQ2),
+    quizResultMap: resultMap(raw?.quizResultMap),
+    quizDefaultProductId: str(raw?.quizDefaultProductId),
+    isActive: bool(raw?.isActive, true),
+    sortOrder: num(raw?.sortOrder, 999),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 interface Catalog {
   label: string;
   perfumesData: readonly { id: string; name: string; priceUSD: number; priceSSP: number }[];
@@ -1054,6 +1185,81 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (err: any) {
       console.error('Error deleting product:', err);
       return res.status(500).json({ error: err.message || 'Failed to delete product' });
+    }
+  });
+
+  // --- Collections (Firestore-backed landing pages) -------------------------
+
+  // GET One collection's config by its URL slug (public — the storefront
+  // fetches this to render the dynamic /collections/:slug page).
+  app.get('/api/collections/:routeSlug', async (req, res) => {
+    try {
+      const snapshot = await getDocs(query(collection(db, 'collections'), limit(200)));
+      const match = snapshot.docs
+        .map((d) => d.data() as StoredCollection)
+        .find((c) => c.routeSlug === req.params.routeSlug && c.isActive !== false);
+      if (!match) {
+        return res.status(404).json({ error: 'Collection not found' });
+      }
+      return res.json(match);
+    } catch (err) {
+      console.error('Error fetching collection:', err);
+      return res.status(500).json({ error: 'Failed to load collection' });
+    }
+  });
+
+  // GET Every collection (public — used for homepage/nav listings)
+  app.get('/api/collections', async (req, res) => {
+    try {
+      const snapshot = await getDocs(query(collection(db, 'collections'), limit(200)));
+      const collections = snapshot.docs
+        .map((d) => d.data() as StoredCollection)
+        .filter((c) => c.isActive !== false)
+        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+      return res.json(collections);
+    } catch (err) {
+      console.error('Error fetching collections:', err);
+      return res.status(500).json({ error: 'Failed to load collections' });
+    }
+  });
+
+  // GET Every collection including inactive ones (admin dashboard)
+  app.get('/api/admin/collections', requireAdminAuth, async (req, res) => {
+    try {
+      const snapshot = await getDocs(query(collection(db, 'collections'), limit(200)));
+      const collections = snapshot.docs
+        .map((d) => d.data() as StoredCollection)
+        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+      return res.json(collections);
+    } catch (err) {
+      console.error('Error fetching admin collections:', err);
+      return res.status(500).json({ error: 'Failed to load collections' });
+    }
+  });
+
+  // POST Create or update a collection (upsert by id)
+  app.post('/api/admin/collections', requireAdminAuth, async (req, res) => {
+    try {
+      const coll = normalizeCollection(req.body);
+      if (!coll.label || !coll.routeSlug) {
+        return res.status(400).json({ error: 'label and routeSlug are required' });
+      }
+      await setDoc(doc(db, 'collections', coll.id), coll);
+      return res.json({ success: true, collection: coll });
+    } catch (err: any) {
+      console.error('Error saving collection:', err);
+      return res.status(500).json({ error: err.message || 'Failed to save collection' });
+    }
+  });
+
+  // DELETE Remove a collection (does not delete its products)
+  app.delete('/api/admin/collections/:id', requireAdminAuth, async (req, res) => {
+    try {
+      await deleteDoc(doc(db, 'collections', req.params.id));
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error deleting collection:', err);
+      return res.status(500).json({ error: err.message || 'Failed to delete collection' });
     }
   });
 
