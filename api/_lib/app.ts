@@ -923,7 +923,12 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         }
 
         if (botToken && chatId) {
-          const replyText = await getAlexTelegramReply(incomingText, senderName);
+          // Special setup command: /chatid replies with the Chat ID so
+          // the admin can configure order notifications.
+          const isSetupCommand = incomingText.trim() === '/chatid' || incomingText.trim() === '/start';
+          const replyText = isSetupCommand
+            ? `✅ Your Chat ID is:\n\n<code>${chatId}</code>\n\nShare this with your developer to enable order notifications.`
+            : await getAlexTelegramReply(incomingText, senderName);
 
           const tgUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
           await fetch(tgUrl, {
@@ -932,6 +937,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
             body: JSON.stringify({
               chat_id: chatId,
               text: replyText,
+              parse_mode: 'HTML',
             }),
           });
         }
