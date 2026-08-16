@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { MarqueeBanner } from './components/MarqueeBanner';
@@ -18,11 +18,12 @@ import { PERFUMES_DATA, RECOMMENDED_BUNDLES, REVIEWS_DATA } from './data/perfume
 import { Currency, CartItem, PerfumeProduct, RecommendedBundle, Order } from './types';
 import { Sparkles, CheckCircle2 } from 'lucide-react';
 import { trackPageview } from '../../lib/trackPageview';
+import { useCollectionProducts } from '../../lib/useCollectionProducts';
 
 export default function App() {
   const [currency, setCurrency] = useState<Currency>('USD');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [perfumes] = useState<PerfumeProduct[]>(PERFUMES_DATA);
+  const perfumes = useCollectionProducts<PerfumeProduct>('badee-al-oud', PERFUMES_DATA);
   const [bundles] = useState<RecommendedBundle[]>(RECOMMENDED_BUNDLES);
   const [reviews] = useState(REVIEWS_DATA);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -40,15 +41,21 @@ export default function App() {
     trackPageview('badee-al-oud');
   }, []);
 
+  // Auto-add from the homepage showcase (?addProduct=id). Reads `perfumes`
+  // so admin-added products work too; the ref guard fires it only once.
+  const hasAutoAdded = useRef(false);
   useEffect(() => {
+    if (hasAutoAdded.current) return;
     const params = new URLSearchParams(window.location.search);
     const productId = params.get('addProduct');
     if (!productId) return;
-    const match = PERFUMES_DATA.find((p) => p.id === productId);
-    if (match) handleAddToCart(match);
+    const match = perfumes.find((p) => p.id === productId);
+    if (!match) return; // wait for the live catalogue to load
+    hasAutoAdded.current = true;
+    handleAddToCart(match);
     window.history.replaceState({}, '', window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [perfumes]);
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 

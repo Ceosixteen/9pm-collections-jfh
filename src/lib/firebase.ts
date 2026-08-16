@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, getDocs, getDoc, deleteDoc, query, orderBy, limit, where } from 'firebase/firestore';
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -20,4 +20,4 @@ const app = initializeApp({
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
 export const firebaseWebApiKey: string = firebaseConfig.apiKey;
-export { collection, doc, setDoc, getDocs, query, orderBy, limit };
+export { collection, doc, setDoc, getDocs, getDoc, deleteDoc, query, orderBy, limit, where };

@@ -26,6 +26,38 @@ export interface AdminOrder {
   telegramError?: string;
 }
 
+export interface AdminProduct {
+  id: string;
+  collectionSlug: string;
+  name: string;
+  timeTag: string;
+  tagline: string;
+  description: string;
+  priceUSD: number;
+  priceSSP: number;
+  originalPriceUSD: number;
+  originalPriceSSP: number;
+  rating: number;
+  reviewsCount: number;
+  image: string;
+  stockCount: number;
+  isBestSeller: boolean;
+  badge: string;
+  projection: string;
+  longevity: string;
+  volume: string;
+  concentration: string;
+  bestTimeToWear: string;
+  notBestTimeToWear: string;
+  notesTop: string[];
+  notesMiddle: string[];
+  notesBase: string[];
+  fragranceFamily: string;
+  sortOrder: number;
+  isActive: boolean;
+  updatedAt?: string;
+}
+
 export interface AdminCampaign {
   id: string;
   title: string;

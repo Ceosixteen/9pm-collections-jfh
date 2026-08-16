@@ -9,6 +9,7 @@ import { LandingPagesView } from './components/LandingPagesView';
 import { HelpRequestsView } from './components/HelpRequestsView';
 import { LeadsView } from './components/LeadsView';
 import { CampaignsView } from './components/CampaignsView';
+import { ProductsView } from './components/ProductsView';
 
 export default function App() {
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'anonymous'>('checking');
@@ -63,6 +64,7 @@ export default function App() {
   const VIEW_TITLES: Record<AdminView, { title: string; subtitle: string }> = {
     overview: { title: 'Overview', subtitle: 'Everything at a glance, across every collection.' },
     orders: { title: 'Orders', subtitle: 'Every order placed across all landing pages.' },
+    products: { title: 'Products', subtitle: 'Add, edit, import and export your entire product catalogue.' },
     clients: { title: 'Clients', subtitle: 'Customers aggregated by phone number, across all collections.' },
     pages: { title: 'Landing Pages', subtitle: 'Sales and traffic broken down per storefront.' },
     leads: { title: 'Email Leads', subtitle: 'Customers who joined the mailing list for discounts and drops.' },
@@ -83,6 +85,7 @@ export default function App() {
 
           {activeView === 'overview' && <OverviewView onUnauthorized={handleUnauthorized} />}
           {activeView === 'orders' && <OrdersView onUnauthorized={handleUnauthorized} />}
+          {activeView === 'products' && <ProductsView onUnauthorized={handleUnauthorized} />}
           {activeView === 'clients' && <ClientsView onUnauthorized={handleUnauthorized} />}
           {activeView === 'pages' && <LandingPagesView onUnauthorized={handleUnauthorized} />}
           {activeView === 'leads' && <LeadsView onUnauthorized={handleUnauthorized} />}

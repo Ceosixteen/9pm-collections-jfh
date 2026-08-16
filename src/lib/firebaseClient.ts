@@ -12,6 +12,7 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = getApps().length ? getApp() : initializeApp({
@@ -78,4 +79,15 @@ export async function getIdToken(): Promise<string | null> {
   const user = auth.currentUser;
   if (!user) return null;
   return user.getIdToken();
+}
+
+// Uploads a product image to Firebase Storage and returns its public URL, so
+// the admin can attach photos to products without hosting them elsewhere.
+export async function uploadProductImage(file: File): Promise<string> {
+  const storage = getStorage(app);
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const path = `products/${Date.now()}-${safeName}`;
+  const fileRef = storageRef(storage, path);
+  await uploadBytes(fileRef, file, { contentType: file.type });
+  return getDownloadURL(fileRef);
 }

@@ -12,9 +12,19 @@ export default function App() {
   // (admin.jubafashionhub.link) rather than a path, so it's routed by
   // hostname here instead of react-router — same build/deployment, just a
   // different entry point once the JS boots.
-  const isAdminHost = typeof window !== 'undefined' && window.location.hostname.startsWith('admin.');
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isAdminHost = hostname.startsWith('admin.');
 
-  if (isAdminHost) {
+  // Local-dev escape hatch: there's no admin.* hostname when running on
+  // localhost, so ?admin=1 opens the same back office. Restricted to local
+  // hostnames so production routing is completely unchanged.
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+  const wantsAdminPreview =
+    isLocalHost &&
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('admin') === '1';
+
+  if (isAdminHost || wantsAdminPreview) {
     return <AdminApp />;
   }
 

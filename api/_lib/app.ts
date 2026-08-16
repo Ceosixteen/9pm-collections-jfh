@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
-import { db, setDoc, doc, collection, getDocs, query, orderBy, limit, firebaseWebApiKey } from '../../src/lib/firebase.js';
+import { db, setDoc, doc, collection, getDocs, deleteDoc, query, orderBy, limit, firebaseWebApiKey } from '../../src/lib/firebase.js';
 import { generateEmailSignInLink } from './firebaseAdmin.js';
 import { buildSignInEmailHtml } from './emailTemplates.js';
 import * as nineCollectionCatalog from './catalogs/nineCollection.js';
@@ -25,6 +25,110 @@ interface Notification {
   orderStatus?: 'delivered' | 'canceled';
   createdAt: string;
   readBy: string[];
+}
+
+// A product as stored in Firestore. Mirrors the old hardcoded PerfumeProduct
+// shape (so storefronts render unchanged) plus the fields needed to manage it
+// from the admin: which collection it belongs to, sort order, and a soft
+// active/inactive flag so items can be hidden without deleting them.
+interface StoredProduct {
+  id: string;
+  collectionSlug: string;
+  name: string;
+  timeTag: string;
+  tagline: string;
+  description: string;
+  priceUSD: number;
+  priceSSP: number;
+  originalPriceUSD: number;
+  originalPriceSSP: number;
+  rating: number;
+  reviewsCount: number;
+  image: string;
+  stockCount: number;
+  isBestSeller: boolean;
+  badge: string;
+  projection: string;
+  longevity: string;
+  volume: string;
+  concentration: string;
+  bestTimeToWear: string;
+  notBestTimeToWear: string;
+  notesTop: string[];
+  notesMiddle: string[];
+  notesBase: string[];
+  fragranceFamily: string;
+  sortOrder: number;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+const SSP_RATE = 8000;
+
+function slugifyId(input: string): string {
+  return String(input)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || `product-${Date.now()}`;
+}
+
+// Accepts partial/messy input (admin form, CSV row, or AI-generated JSON) and
+// returns a complete product with sane defaults. Notes may arrive as arrays or
+// as comma-separated strings (CSV), and SSP prices are derived from USD when
+// not supplied so the admin only has to enter one currency.
+function normalizeProduct(raw: any): StoredProduct {
+  const toArray = (v: any): string[] => {
+    if (Array.isArray(v)) return v.map((s) => String(s).trim()).filter(Boolean);
+    if (typeof v === 'string') return v.split(',').map((s) => s.trim()).filter(Boolean);
+    return [];
+  };
+  const num = (v: any, fallback = 0): number => {
+    const n = typeof v === 'string' ? parseFloat(v.replace(/[^0-9.-]/g, '')) : Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const bool = (v: any, fallback = false): boolean => {
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'string') return ['true', 'yes', '1', 'y'].includes(v.trim().toLowerCase());
+    return fallback;
+  };
+
+  const name = String(raw?.name || '').trim();
+  const priceUSD = num(raw?.priceUSD);
+  const originalPriceUSD = num(raw?.originalPriceUSD, priceUSD);
+
+  return {
+    id: String(raw?.id || '').trim() || slugifyId(name),
+    collectionSlug: String(raw?.collectionSlug || '').trim(),
+    name,
+    timeTag: String(raw?.timeTag || '').trim(),
+    tagline: String(raw?.tagline || '').trim(),
+    description: String(raw?.description || '').trim(),
+    priceUSD,
+    priceSSP: num(raw?.priceSSP) || priceUSD * SSP_RATE,
+    originalPriceUSD,
+    originalPriceSSP: num(raw?.originalPriceSSP) || originalPriceUSD * SSP_RATE,
+    rating: num(raw?.rating, 4.8),
+    reviewsCount: num(raw?.reviewsCount, 0),
+    image: String(raw?.image || '').trim(),
+    stockCount: num(raw?.stockCount, 10),
+    isBestSeller: bool(raw?.isBestSeller),
+    badge: String(raw?.badge || '').trim(),
+    projection: String(raw?.projection || '').trim(),
+    longevity: String(raw?.longevity || '').trim(),
+    volume: String(raw?.volume || '').trim(),
+    concentration: String(raw?.concentration || '').trim(),
+    bestTimeToWear: String(raw?.bestTimeToWear || '').trim(),
+    notBestTimeToWear: String(raw?.notBestTimeToWear || '').trim(),
+    notesTop: toArray(raw?.notesTop),
+    notesMiddle: toArray(raw?.notesMiddle),
+    notesBase: toArray(raw?.notesBase),
+    fragranceFamily: String(raw?.fragranceFamily || '').trim(),
+    sortOrder: num(raw?.sortOrder, 999),
+    isActive: bool(raw?.isActive, true),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 interface Catalog {
@@ -833,6 +937,102 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (err) {
       console.error('Failed to record pageview:', err);
       return res.json({ success: false });
+    }
+  });
+
+  // --- Products (Firestore-backed catalogue) --------------------------------
+  // Products live in Firestore so the admin can add/edit them at runtime and
+  // the AI can create them by prompt. The storefronts read from here instead
+  // of the old hardcoded perfumesData.ts files.
+
+  // GET Products for one storefront (public — this is the catalogue shoppers see)
+  app.get('/api/products', async (req, res) => {
+    try {
+      const collectionSlug = typeof req.query.collection === 'string' ? req.query.collection : '';
+      const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
+      let products = snapshot.docs.map((d) => d.data() as StoredProduct);
+      if (collectionSlug) {
+        products = products.filter((p) => p.collectionSlug === collectionSlug);
+      }
+      products = products
+        .filter((p) => p.isActive !== false)
+        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+      return res.json(products);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      return res.status(500).json({ error: 'Failed to load products' });
+    }
+  });
+
+  // GET Every product across every collection (admin dashboard)
+  app.get('/api/admin/products', requireAdminAuth, async (req, res) => {
+    try {
+      const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
+      const products = snapshot.docs
+        .map((d) => d.data() as StoredProduct)
+        .sort((a, b) => {
+          const bySlug = (a.collectionSlug || '').localeCompare(b.collectionSlug || '');
+          return bySlug !== 0 ? bySlug : (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
+        });
+      return res.json(products);
+    } catch (err) {
+      console.error('Error fetching admin products:', err);
+      return res.status(500).json({ error: 'Failed to load products' });
+    }
+  });
+
+  // POST Create or update a single product (upsert by id)
+  app.post('/api/admin/products', requireAdminAuth, async (req, res) => {
+    try {
+      const product = normalizeProduct(req.body);
+      if (!product.name || !product.collectionSlug) {
+        return res.status(400).json({ error: 'name and collectionSlug are required' });
+      }
+      await setDoc(doc(db, 'products', product.id), product);
+      return res.json({ success: true, product });
+    } catch (err: any) {
+      console.error('Error saving product:', err);
+      return res.status(500).json({ error: err.message || 'Failed to save product' });
+    }
+  });
+
+  // POST Bulk upsert (used by CSV import and by the AI assistant)
+  app.post('/api/admin/products/bulk', requireAdminAuth, async (req, res) => {
+    try {
+      const incoming = Array.isArray(req.body?.products) ? req.body.products : [];
+      if (!incoming.length) {
+        return res.status(400).json({ error: 'No products provided' });
+      }
+      const saved: StoredProduct[] = [];
+      const failed: { name?: string; error: string }[] = [];
+      for (const raw of incoming) {
+        try {
+          const product = normalizeProduct(raw);
+          if (!product.name || !product.collectionSlug) {
+            failed.push({ name: raw?.name, error: 'Missing name or collectionSlug' });
+            continue;
+          }
+          await setDoc(doc(db, 'products', product.id), product);
+          saved.push(product);
+        } catch (e: any) {
+          failed.push({ name: raw?.name, error: e?.message || String(e) });
+        }
+      }
+      return res.json({ success: true, savedCount: saved.length, failedCount: failed.length, failed });
+    } catch (err: any) {
+      console.error('Bulk product import failed:', err);
+      return res.status(500).json({ error: err.message || 'Bulk import failed' });
+    }
+  });
+
+  // DELETE Remove a product
+  app.delete('/api/admin/products/:id', requireAdminAuth, async (req, res) => {
+    try {
+      await deleteDoc(doc(db, 'products', req.params.id));
+      return res.json({ success: true });
+    } catch (err: any) {
+      console.error('Error deleting product:', err);
+      return res.status(500).json({ error: err.message || 'Failed to delete product' });
     }
   });
 
