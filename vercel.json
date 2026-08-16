@@ -1,6 +1,10 @@
 {
   "buildCommand": "vite build && node scripts/generate-seo-html.mjs",
   "outputDirectory": "dist",
+  "alias": [
+    "jubafashionhub.link",
+    "admin.jubafashionhub.link"
+  ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
