@@ -2,7 +2,26 @@ import React, { useState } from 'react';
 import { X, Loader2, Upload, Save, Link2 } from 'lucide-react';
 import { adminFetch, AdminUnauthorizedError } from '../lib/api';
 import { AdminProduct, STORE_LABELS } from '../types';
-import { uploadProductImage } from '../../../lib/firebaseClient';
+
+// Reads a File into a base64 string (without the data: URL prefix) so it can
+// be sent as JSON to our server-side upload endpoint. We upload through our
+// own backend (using its existing service-account credentials) rather than
+// the client Firebase Storage SDK directly, because the admin panel doesn't
+// authenticate into Firebase Auth — it uses a separate signed-cookie
+// session — so a direct browser upload would be rejected by Storage's
+// security rules.
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
 
 interface ProductEditorModalProps {
   product: AdminProduct | null; // null = creating a new product
@@ -41,14 +60,18 @@ export const ProductEditorModal: React.FC<ProductEditorModalProps> = ({
     setIsUploading(true);
     setError(null);
     try {
-      const url = await uploadProductImage(file);
+      const imageBase64 = await fileToBase64(file);
+      const { url } = await adminFetch<{ url: string }>('/api/admin/upload-image', {
+        method: 'POST',
+        body: JSON.stringify({ imageBase64, contentType: file.type, filename: file.name }),
+      });
       set('image', url);
     } catch (err: any) {
-      setError(
-        err?.code === 'storage/unauthorized'
-          ? 'Firebase Storage rejected the upload. Enable Storage in the Firebase Console, or paste an image URL instead.'
-          : `Upload failed: ${err?.message || 'unknown error'}. You can paste an image URL instead.`
-      );
+      if (err instanceof AdminUnauthorizedError) {
+        onUnauthorized();
+        return;
+      }
+      setError(`${err?.message || 'Upload failed'} You can paste an image URL instead.`);
     } finally {
       setIsUploading(false);
     }

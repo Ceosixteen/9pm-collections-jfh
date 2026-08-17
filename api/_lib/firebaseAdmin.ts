@@ -12,6 +12,7 @@
 // verifyFirebaseIdToken in app.ts).
 import { readFileSync } from 'fs';
 import crypto from 'crypto';
+import { firebaseStorageBucket } from '../../src/lib/firebase.js';
 
 interface ServiceAccount {
   client_email: string;
@@ -116,4 +117,64 @@ export async function generateEmailSignInLink(email: string, continueUrl: string
     throw new Error('Firebase did not return a sign-in link');
   }
   return data.oobLink;
+}
+
+// Uploads an image to Firebase Storage entirely server-side, using the same
+// service account as everything else in this file. Deliberately NOT done via
+// the client-side Firebase Storage SDK — the admin panel doesn't sign
+// visitors into Firebase Auth (it uses its own cookie-based session), so a
+// direct browser upload would be rejected by Storage's default security
+// rules with no clean way around it. A service-account-authenticated request
+// to the underlying Cloud Storage API bypasses Firebase Storage Rules
+// entirely (they only govern client-SDK/Firebase-Auth-context requests), so
+// this works regardless of what the rules say — only reads need a public
+// rule, since customers' browsers load the resulting image URL directly.
+export async function uploadImageToStorage(
+  base64Data: string,
+  contentType: string,
+  filename: string
+): Promise<string> {
+  const accessToken = await getGoogleAccessToken();
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const objectPath = `products/${Date.now()}-${safeName}`;
+  const buffer = Buffer.from(base64Data, 'base64');
+
+  const uploadRes = await fetch(
+    `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(firebaseStorageBucket)}/o?uploadType=media&name=${encodeURIComponent(objectPath)}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': contentType || 'application/octet-stream',
+      },
+      body: buffer,
+    }
+  );
+
+  if (!uploadRes.ok) {
+    throw new Error(`Storage upload failed (HTTP ${uploadRes.status}): ${await uploadRes.text()}`);
+  }
+
+  // Attach a download token via the Firebase Storage REST API — this is the
+  // same mechanism getDownloadURL() uses under the hood client-side, and
+  // produces a URL that works as long as Storage Rules allow public reads.
+  const token = crypto.randomUUID();
+  const encodedPath = encodeURIComponent(objectPath);
+  const patchRes = await fetch(
+    `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(firebaseStorageBucket)}/o/${encodedPath}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ metadata: { firebaseStorageDownloadTokens: token } }),
+    }
+  );
+
+  if (!patchRes.ok) {
+    throw new Error(`Could not finalize the uploaded image (HTTP ${patchRes.status}): ${await patchRes.text()}`);
+  }
+
+  return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(firebaseStorageBucket)}/o/${encodedPath}?alt=media&token=${token}`;
 }

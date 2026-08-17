@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
 import { db, setDoc, doc, collection, getDocs, deleteDoc, query, orderBy, limit, firebaseWebApiKey } from '../../src/lib/firebase.js';
-import { generateEmailSignInLink } from './firebaseAdmin.js';
+import { generateEmailSignInLink, uploadImageToStorage } from './firebaseAdmin.js';
 import { buildSignInEmailHtml } from './emailTemplates.js';
 import * as nineCollectionCatalog from './catalogs/nineCollection.js';
 import * as hawasCatalog from './catalogs/hawas.js';
@@ -288,6 +288,26 @@ interface DeliveryStep {
   title: string;
   desc: string;
 }
+interface StoredBundle {
+  id: string;
+  name: string;
+  badge: string;
+  description: string;
+  productIds: string[];
+  priceUSD: number;
+  originalPriceUSD: number;
+  savingsUSD: number;
+  isPopular: boolean;
+}
+interface StoredReview {
+  id: string;
+  name: string;
+  location: string;
+  rating: number;
+  quote: string;
+  favoriteProduct: string;
+  date: string;
+}
 interface StoredCollection {
   id: string; // internal key — matches products.collectionSlug and orders.storeSlug
   routeSlug: string; // URL segment: /collections/{routeSlug}
@@ -318,6 +338,8 @@ interface StoredCollection {
   quizQ2: QuizQuestion;
   quizResultMap: Record<string, string>; // option value -> product id
   quizDefaultProductId: string;
+  bundles: StoredBundle[];
+  reviews: StoredReview[];
   isActive: boolean;
   sortOrder: number;
   updatedAt: string;
@@ -356,6 +378,36 @@ function normalizeCollection(raw: any): StoredCollection {
     }
     return {};
   };
+  const idList = (v: any): string[] =>
+    Array.isArray(v) ? v.map((s) => String(s).trim()).filter(Boolean)
+      : typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+  const bundleList = (v: any): StoredBundle[] =>
+    Array.isArray(v)
+      ? v.map((b: any, i: number) => ({
+          id: str(b?.id) || `bundle-${i + 1}`,
+          name: str(b?.name),
+          badge: str(b?.badge),
+          description: str(b?.description),
+          productIds: idList(b?.productIds),
+          priceUSD: num(b?.priceUSD),
+          originalPriceUSD: num(b?.originalPriceUSD, num(b?.priceUSD)),
+          savingsUSD: num(b?.savingsUSD, Math.max(0, num(b?.originalPriceUSD) - num(b?.priceUSD))),
+          isPopular: bool(b?.isPopular, false),
+        }))
+      : [];
+  const reviewList = (v: any): StoredReview[] =>
+    Array.isArray(v)
+      ? v.map((r: any, i: number) => ({
+          id: str(r?.id) || `rev-${i + 1}`,
+          name: str(r?.name),
+          location: str(r?.location, 'Juba'),
+          rating: num(r?.rating, 5),
+          quote: str(r?.quote),
+          favoriteProduct: str(r?.favoriteProduct),
+          date: str(r?.date, 'Recently'),
+        }))
+      : [];
 
   const id = str(raw?.id) || slugifyId(str(raw?.label));
   const label = str(raw?.label);
@@ -390,6 +442,8 @@ function normalizeCollection(raw: any): StoredCollection {
     quizQ2: question(raw?.quizQ2),
     quizResultMap: resultMap(raw?.quizResultMap),
     quizDefaultProductId: str(raw?.quizDefaultProductId),
+    bundles: bundleList(raw?.bundles),
+    reviews: reviewList(raw?.reviews),
     isActive: bool(raw?.isActive, true),
     sortOrder: num(raw?.sortOrder, 999),
     updatedAt: new Date().toISOString(),
@@ -823,7 +877,12 @@ INSTRUCTIONS FOR ALEX:
 
 export function createApp(): express.Express {
   const app = express();
-  app.use(express.json());
+  // Default 100kb limit is fine for everything except base64-encoded product
+  // photo uploads (POST /api/admin/upload-image) — a base64 string runs ~33%
+  // larger than the original file, so a modest few-MB phone photo can exceed
+  // it easily. Raised globally rather than scoped to one route since it's
+  // the simplest way to keep a single body-parser instance for the app.
+  app.use(express.json({ limit: '12mb' }));
 
   // --- Admin auth endpoints ---
   app.post('/api/admin/login', (req, res) => {
@@ -1264,6 +1323,33 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (err) {
       console.error('Error fetching admin products:', err);
       return res.status(500).json({ error: 'Failed to load products' });
+    }
+  });
+
+  // POST Upload a product image. Runs entirely server-side through the
+  // service account (see uploadImageToStorage) rather than a direct
+  // browser-to-Firebase-Storage upload, since the admin panel doesn't sign
+  // visitors into Firebase Auth — a client-side upload would be rejected by
+  // Storage's default security rules. Body is JSON with base64 image data
+  // (small images only; Express's default body-parser limit applies).
+  app.post('/api/admin/upload-image', requireAdminAuth, async (req, res) => {
+    try {
+      const { imageBase64, contentType, filename } = req.body || {};
+      if (!imageBase64 || typeof imageBase64 !== 'string') {
+        return res.status(400).json({ error: 'imageBase64 is required' });
+      }
+      if (!contentType || !String(contentType).startsWith('image/')) {
+        return res.status(400).json({ error: 'A valid image contentType is required' });
+      }
+      const url = await uploadImageToStorage(imageBase64, contentType, filename || 'upload.jpg');
+      return res.json({ success: true, url });
+    } catch (err: any) {
+      console.error('Image upload failed:', err);
+      const message = String(err?.message || '');
+      const friendly = message.includes('404') || message.toLowerCase().includes('not found')
+        ? 'Firebase Storage isn’t enabled yet for this project. Enable it in the Firebase Console (Storage → Get started), then try again.'
+        : message || 'Image upload failed';
+      return res.status(500).json({ error: friendly });
     }
   });
 
