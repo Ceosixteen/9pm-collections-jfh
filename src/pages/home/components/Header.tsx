@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, ShieldCheck, Truck, User } from 'lucide-react';
+import { Phone, ShieldCheck, Truck, User, Search } from 'lucide-react';
+import { SearchModal } from '../../../components/SearchModal';
 
 export const Header: React.FC = () => {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const collections = [
     { to: '/collections/9pm', label: 'The 9 Collection' },
     { to: '/collections/hawas', label: 'Rasasi Hawas' },
@@ -52,6 +54,13 @@ export const Header: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            aria-label="Search"
+            className="p-1.5 sm:p-2 rounded-full bg-white text-slate-700 border border-gray-200 hover:border-[#B24BF3] hover:text-[#B24BF3] transition-all shadow-xs cursor-pointer"
+          >
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
           <Link
             to="/account"
             aria-label="My Account"
@@ -67,6 +76,8 @@ export const Header: React.FC = () => {
           </a>
         </div>
       </div>
+
+      {isSearchOpen && <SearchModal onClose={() => setIsSearchOpen(false)} />}
 
       {/* Collections Navigation Strip */}
       <div className="w-full bg-[#B24BF3] text-white shadow-xs overflow-x-auto no-scrollbar">

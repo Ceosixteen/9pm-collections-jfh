@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Diamond, User } from 'lucide-react';
+import { ShoppingBag, Diamond, User, Search } from 'lucide-react';
 import { Currency } from '../types';
+import { SearchModal } from '../../../components/SearchModal';
 
 interface HeaderProps {
   currency: Currency;
@@ -22,14 +23,16 @@ export const Header: React.FC<HeaderProps> = ({
   selectedCategory,
   onSelectCategory,
 }) => {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const categories = [
     { id: 'cerave', label: 'CeraVe Skincare' },
     { id: 'bundles', label: 'Routine Bundles' },
   ];
 
   return (
+    <>
     <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs transition-all duration-300">
-      
+
       {/* Top Urgency Announcement Bar - Compact on Mobile */}
       <div className="w-full bg-gradient-to-r from-red-600 via-purple-700 to-indigo-800 text-white text-[10px] sm:text-xs font-bold py-1 px-3 text-center flex items-center justify-center gap-1.5 tracking-wide shadow-inner">
         <span className="animate-pulse">🔥</span>
@@ -41,7 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main Header Bar - Optimized for Mobile */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-3 flex items-center justify-between gap-2">
-        
+
         {/* Left: Juba Fashion Hub Logo (links back to all collections) */}
         <div className="flex items-center gap-2 shrink-0">
           <Link to="/" className="flex items-center gap-2">
@@ -56,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right: USD/SSP Toggle, Quiz & Cart Button */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          
+
           {/* USD/SSP Currency Switcher Toggle */}
           <div className="flex items-center p-0.5 sm:p-1 rounded-full bg-[#18181B] text-white text-[10px] sm:text-xs font-semibold border border-gray-800">
             <button
@@ -95,6 +98,15 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 border border-white animate-pulse"></span>
             </div>
             <span className="hidden xs:inline">Find My Match</span>
+          </button>
+
+          {/* Search Button */}
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            aria-label="Search"
+            className="p-1.5 sm:p-2 rounded-full bg-white text-slate-700 border border-gray-200 hover:border-[#B24BF3] hover:text-[#B24BF3] transition-all shadow-xs cursor-pointer"
+          >
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           {/* My Account Link */}
@@ -153,6 +165,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
     </header>
+
+      {isSearchOpen && <SearchModal onClose={() => setIsSearchOpen(false)} />}
+    </>
   );
 };
-;

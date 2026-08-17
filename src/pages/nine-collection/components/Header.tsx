@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Diamond, User } from 'lucide-react';
+import { ShoppingBag, Diamond, User, Search } from 'lucide-react';
 import { Currency } from '../types';
+import { SearchModal } from '../../../components/SearchModal';
 
 interface HeaderProps {
   currency: Currency;
@@ -22,14 +23,16 @@ export const Header: React.FC<HeaderProps> = ({
   selectedCategory,
   onSelectCategory,
 }) => {
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const categories = [
     { id: 'afnan-9', label: '9PM & 9AM Afnan' },
     { id: 'bundles', label: 'Perfume Bundles' },
   ];
 
   return (
+    <>
     <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200/80 shadow-xs transition-all duration-300">
-      
+
       {/* Top Urgency Announcement Bar - Compact on Mobile */}
       <div className="w-full bg-gradient-to-r from-red-600 via-purple-700 to-indigo-800 text-white text-[10px] sm:text-xs font-bold py-1 px-3 text-center flex items-center justify-center gap-1.5 tracking-wide shadow-inner">
         <span className="animate-pulse">🔥</span>
@@ -97,6 +100,15 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden xs:inline">Find My Scent</span>
           </button>
 
+          {/* Search Button */}
+          <button
+            onClick={() => setIsSearchOpen(true)}
+            aria-label="Search"
+            className="p-1.5 sm:p-2 rounded-full bg-white text-slate-700 border border-gray-200 hover:border-[#B24BF3] hover:text-[#B24BF3] transition-all shadow-xs cursor-pointer"
+          >
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
+
           {/* My Account Link */}
           <Link
             to="/account"
@@ -153,6 +165,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
     </header>
+
+      {isSearchOpen && <SearchModal onClose={() => setIsSearchOpen(false)} />}
+    </>
   );
 };
-;
