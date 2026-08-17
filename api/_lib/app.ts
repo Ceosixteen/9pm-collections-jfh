@@ -60,6 +60,7 @@ interface StoredProduct {
   fragranceFamily: string;
   sortOrder: number;
   isActive: boolean;
+  sourceUrl?: string; // set when this product was created via URL import, for traceability
   updatedAt: string;
 }
 
@@ -127,8 +128,141 @@ function normalizeProduct(raw: any): StoredProduct {
     fragranceFamily: String(raw?.fragranceFamily || '').trim(),
     sortOrder: num(raw?.sortOrder, 999),
     isActive: bool(raw?.isActive, true),
+    sourceUrl: raw?.sourceUrl ? String(raw.sourceUrl).trim() : undefined,
     updatedAt: new Date().toISOString(),
   };
+}
+
+// --- URL-based product import ----------------------------------------------
+// Lets the admin paste product links from anywhere on the internet and have
+// them scraped, translated, and turned into draft products (isActive:false)
+// ready for a quick review before going live. Deliberately dependency-free —
+// no HTML parser library — since a heavy new dependency is exactly what
+// crashed production once already on this project (see firebaseAdmin.ts).
+// Regex-based extraction of OG tags / JSON-LD covers the vast majority of
+// e-commerce sites; anything missing is filled in by Groq from the page text.
+
+function stripHtmlTags(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractMetaTag(html: string, prop: string): string | undefined {
+  const escaped = prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']*)["']`, 'i'),
+    new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${escaped}["']`, 'i'),
+  ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m && m[1]) return m[1].trim();
+  }
+  return undefined;
+}
+
+function extractJsonLd(html: string): any[] {
+  const blocks: any[] = [];
+  const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html))) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (Array.isArray(parsed)) blocks.push(...parsed);
+      else blocks.push(parsed);
+    } catch {
+      // Malformed JSON-LD on the source page — skip it, Groq fallback covers this.
+    }
+  }
+  return blocks;
+}
+
+interface ScrapedSignals {
+  title?: string;
+  description?: string;
+  image?: string;
+  price?: number;
+  bodyText: string;
+}
+
+async function scrapeProductPage(url: string): Promise<ScrapedSignals> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`Could not fetch page (HTTP ${res.status})`);
+  const html = await res.text();
+
+  const jsonLdBlocks = extractJsonLd(html);
+  const productLd = jsonLdBlocks.find((b) => {
+    const type = b?.['@type'];
+    return type === 'Product' || (Array.isArray(type) && type.includes('Product'));
+  });
+  const offers = Array.isArray(productLd?.offers) ? productLd.offers[0] : productLd?.offers;
+  const ldImage = Array.isArray(productLd?.image) ? productLd.image[0] : productLd?.image;
+
+  const titleTagMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const priceMeta = extractMetaTag(html, 'product:price:amount') || extractMetaTag(html, 'og:price:amount');
+
+  return {
+    title: productLd?.name || extractMetaTag(html, 'og:title') || (titleTagMatch ? titleTagMatch[1].trim() : undefined),
+    description: productLd?.description || extractMetaTag(html, 'og:description') || extractMetaTag(html, 'description'),
+    image: ldImage || extractMetaTag(html, 'og:image'),
+    price: offers?.price ? Number(offers.price) : (priceMeta ? Number(priceMeta) : undefined),
+    bodyText: stripHtmlTags(html).slice(0, 6000),
+  };
+}
+
+const IMPORT_EXTRACTION_PROMPT = `You are a product data extraction assistant for a Juba, South Sudan e-commerce store. You are given raw scraped signals from a product page — which may be in any language — and must output a SINGLE JSON object describing the product, fully translated and rewritten in natural, compelling English. Output ONLY the raw JSON object: no markdown formatting, no code fences, no commentary before or after.
+
+JSON shape (all fields required, use empty string / 0 if truly unknown):
+{
+  "name": string,
+  "tagline": string (under 12 words, catchy),
+  "description": string (2-3 sentences, rewritten to sound appealing to a Juba customer),
+  "priceUSD": number (best-guess price in USD; convert from any other currency shown; use 0 if genuinely no price is visible),
+  "notesTop": string (comma-separated key ingredients or fragrance notes if visible on the page, else empty string),
+  "badge": string (short marketing badge, e.g. "New Arrival")
+}`;
+
+async function buildDraftProductFromUrl(url: string, collectionSlug: string): Promise<StoredProduct> {
+  const scraped = await scrapeProductPage(url);
+
+  const userPrompt = `SOURCE URL: ${url}
+PAGE TITLE: ${scraped.title || 'unknown'}
+META DESCRIPTION: ${scraped.description || 'unknown'}
+DETECTED PRICE: ${scraped.price ?? 'unknown'}
+PAGE TEXT EXCERPT: ${scraped.bodyText || '(no readable text found — this page may require JavaScript to render)'}`;
+
+  const raw = await callGroq(IMPORT_EXTRACTION_PROMPT, userPrompt, 0.4, 'llama-3.3-70b-versatile');
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
+  const parsed = JSON.parse(cleaned);
+
+  return normalizeProduct({
+    name: parsed.name || scraped.title || 'Imported Product',
+    tagline: parsed.tagline || '',
+    description: parsed.description || scraped.description || '',
+    priceUSD: parsed.priceUSD || scraped.price || 0,
+    notesTop: parsed.notesTop || '',
+    badge: parsed.badge || '✨ Imported — Needs Review',
+    image: scraped.image || '',
+    collectionSlug,
+    isActive: false, // draft — admin reviews and flips the toggle when ready
+    sourceUrl: url,
+  });
 }
 
 // --- Collections (Firestore-backed landing pages) --------------------------
@@ -1174,6 +1308,47 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
     } catch (err: any) {
       console.error('Bulk product import failed:', err);
       return res.status(500).json({ error: err.message || 'Bulk import failed' });
+    }
+  });
+
+  // POST Import products by pasting links from anywhere on the internet.
+  // Each URL is scraped, translated/rewritten by Groq, and saved as a DRAFT
+  // (isActive: false) so the admin can review, fix up, and flip it live —
+  // never publishes anything automatically. Capped per request to stay
+  // comfortably inside the serverless function's time budget.
+  app.post('/api/admin/products/import-urls', requireAdminAuth, async (req, res) => {
+    try {
+      const { urls, collectionSlug } = req.body || {};
+      if (!collectionSlug || typeof collectionSlug !== 'string') {
+        return res.status(400).json({ error: 'collectionSlug is required' });
+      }
+      const cleanUrls: string[] = (Array.isArray(urls) ? urls : [])
+        .map((u: any) => String(u || '').trim())
+        .filter((u: string) => /^https?:\/\//i.test(u))
+        .slice(0, 8);
+
+      if (!cleanUrls.length) {
+        return res.status(400).json({ error: 'Provide at least one valid http(s) URL' });
+      }
+
+      const settled = await Promise.allSettled(
+        cleanUrls.map(async (url) => {
+          const product = await buildDraftProductFromUrl(url, collectionSlug);
+          await setDoc(doc(db, 'products', product.id), product);
+          return product;
+        })
+      );
+
+      const results = settled.map((r, i) =>
+        r.status === 'fulfilled'
+          ? { url: cleanUrls[i], success: true, product: r.value }
+          : { url: cleanUrls[i], success: false, error: r.reason?.message || String(r.reason) }
+      );
+
+      return res.json({ results });
+    } catch (err: any) {
+      console.error('URL product import failed:', err);
+      return res.status(500).json({ error: err.message || 'Import failed' });
     }
   });
 

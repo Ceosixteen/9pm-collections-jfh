@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Loader2, Search, Plus, Pencil, Trash2, Download, Upload, Package, EyeOff, Star,
+  Loader2, Search, Plus, Pencil, Trash2, Download, Upload, Package, EyeOff, Star, Globe,
 } from 'lucide-react';
 import { adminFetch, AdminUnauthorizedError } from '../lib/api';
 import { AdminProduct, STORE_LABELS } from '../types';
 import { Panel } from './Panel';
 import { ProductEditorModal } from './ProductEditorModal';
+import { ImportFromUrlsModal } from './ImportFromUrlsModal';
 import { toCsv, parseCsv, downloadCsv } from '../lib/csv';
 
 interface ProductsViewProps {
@@ -29,6 +30,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ onUnauthorized }) =>
   const [isCreating, setIsCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [showUrlImport, setShowUrlImport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
@@ -138,6 +140,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ onUnauthorized }) =>
             </button>
             <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); }} />
+            <button onClick={() => setShowUrlImport(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-bold cursor-pointer">
+              <Globe className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import from Links</span>
+            </button>
             <button onClick={() => setIsCreating(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#B24BF3] hover:bg-[#9f35e3] text-white text-xs font-bold cursor-pointer">
               <Plus className="w-3.5 h-3.5" /> Add Product
@@ -255,6 +261,16 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ onUnauthorized }) =>
           onClose={() => { setEditing(null); setIsCreating(false); }}
           onSaved={load}
           onUnauthorized={onUnauthorized}
+        />
+      )}
+
+      {showUrlImport && (
+        <ImportFromUrlsModal
+          knownCollections={collections}
+          onClose={() => setShowUrlImport(false)}
+          onImported={load}
+          onUnauthorized={onUnauthorized}
+          onEditProduct={(product) => { setShowUrlImport(false); setEditing(product); }}
         />
       )}
     </>

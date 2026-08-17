@@ -58,6 +58,58 @@ export interface AdminProduct {
   updatedAt?: string;
 }
 
+export interface QuizOption {
+  value: string;
+  emoji: string;
+  label: string;
+  description: string;
+}
+
+export interface QuizQuestion {
+  text: string;
+  options: QuizOption[];
+}
+
+export interface DeliveryStep {
+  title: string;
+  desc: string;
+}
+
+export interface AdminCollection {
+  id: string;
+  routeSlug: string;
+  label: string;
+  category: string;
+  unitNounSingular: string;
+  unitNounPlural: string;
+  detailsLabel: string;
+  navCategoryLabel: string;
+  heroCategory: string;
+  heroTitleMain: string;
+  heroTitleAccent: string;
+  heroDescription: string;
+  heroCtaLabel: string;
+  heroFinderCtaLabel: string;
+  catalogTag: string;
+  catalogTitle: string;
+  catalogDescription: string;
+  catalogAllLabel: string;
+  bundleTitle: string;
+  bundleMaxSavingsUSD: number;
+  bundleUnitLabel: string;
+  deliverySteps: DeliveryStep[];
+  quizTitle: string;
+  quizSubtitle: string;
+  quizDescription: string;
+  quizQ1: QuizQuestion;
+  quizQ2: QuizQuestion;
+  quizResultMap: Record<string, string>;
+  quizDefaultProductId: string;
+  isActive: boolean;
+  sortOrder: number;
+  updatedAt?: string;
+}
+
 export interface AdminCampaign {
   id: string;
   title: string;
