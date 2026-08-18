@@ -155,26 +155,10 @@ export async function uploadImageToStorage(
     throw new Error(`Storage upload failed (HTTP ${uploadRes.status}): ${await uploadRes.text()}`);
   }
 
-  // Attach a download token via the Firebase Storage REST API — this is the
-  // same mechanism getDownloadURL() uses under the hood client-side, and
-  // produces a URL that works as long as Storage Rules allow public reads.
-  const token = crypto.randomUUID();
+  // No download token needed: Storage Rules for this bucket allow public
+  // reads (`allow read: if true`), so the plain alt=media URL resolves for
+  // anyone, same as any other public asset. A token is only necessary to
+  // punch through rules that would otherwise require auth.
   const encodedPath = encodeURIComponent(objectPath);
-  const patchRes = await fetch(
-    `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(firebaseStorageBucket)}/o/${encodedPath}`,
-    {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ metadata: { firebaseStorageDownloadTokens: token } }),
-    }
-  );
-
-  if (!patchRes.ok) {
-    throw new Error(`Could not finalize the uploaded image (HTTP ${patchRes.status}): ${await patchRes.text()}`);
-  }
-
-  return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(firebaseStorageBucket)}/o/${encodedPath}?alt=media&token=${token}`;
+  return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(firebaseStorageBucket)}/o/${encodedPath}?alt=media`;
 }
