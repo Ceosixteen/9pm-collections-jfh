@@ -88,6 +88,7 @@ export default function App() {
           {activeView === 'overview' && <OverviewView onUnauthorized={handleUnauthorized} />}
           {activeView === 'orders' && <OrdersView onUnauthorized={handleUnauthorized} />}
           {activeView === 'products' && <ProductsView onUnauthorized={handleUnauthorized} />}
+          {activeView === 'collections' && <CollectionsView onUnauthorized={handleUnauthorized} />}
           {activeView === 'clients' && <ClientsView onUnauthorized={handleUnauthorized} />}
           {activeView === 'pages' && <LandingPagesView onUnauthorized={handleUnauthorized} />}
           {activeView === 'leads' && <LeadsView onUnauthorized={handleUnauthorized} />}
