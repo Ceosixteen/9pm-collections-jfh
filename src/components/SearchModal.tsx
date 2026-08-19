@@ -18,6 +18,7 @@ const COLLECTION_PATHS: Record<string, string> = {
   hawas: '/collections/hawas',
   cerave: '/collections/cerave',
   'badee-al-oud': '/collections/badee-al-oud',
+  medix: '/collections/medix',
 };
 
 const COLLECTION_LABELS: Record<string, string> = {
@@ -25,6 +26,7 @@ const COLLECTION_LABELS: Record<string, string> = {
   hawas: 'Rasasi Hawas',
   cerave: 'CeraVe Skincare',
   'badee-al-oud': "Bade'e Al Oud",
+  medix: 'Medix 5.5 Body Care',
 };
 
 interface SearchModalProps {

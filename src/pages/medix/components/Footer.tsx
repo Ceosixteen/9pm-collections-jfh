@@ -1,32 +1,26 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { MapPin, Phone, ShieldCheck, Clock } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-[#18181B] text-gray-300 border-t border-gray-800 pt-12 pb-10">
+    <footer className="bg-[#18181B] text-gray-300 border-t border-gray-800 pt-12 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-
+          
           {/* Brand Info */}
           <div className="space-y-3 md:col-span-1">
-            <img
-              src="/images/juba_fashion_hub_logo.jpg"
-              alt="Juba Fashion Hub"
-              className="h-10 w-auto object-contain rounded-md bg-white p-1"
-              referrerPolicy="no-referrer"
-            />
+            <div className="flex items-center gap-2">
+              <img
+                src="/images/juba_fashion_hub_logo.jpg"
+                alt="Juba Fashion Hub"
+                className="h-10 w-auto object-contain rounded-md bg-white p-1"
+                referrerPolicy="no-referrer"
+              />
+            </div>
             <p className="text-xs leading-relaxed text-gray-400 font-normal">
               We are an online store based in Juba. We own private warehouses where we import our items directly from original suppliers and dispatch our dedicated delivery riders across Juba.
             </p>
-            <div className="flex flex-col gap-1.5 text-xs text-gray-400 pt-2">
-              <Link to="/collections/9pm" className="hover:text-white transition-colors">The 9 Collection</Link>
-              <Link to="/collections/hawas" className="hover:text-white transition-colors">Rasasi Hawas Collection</Link>
-              <Link to="/collections/cerave" className="hover:text-white transition-colors">CeraVe Skincare Collection</Link>
-              <Link to="/collections/badee-al-oud" className="hover:text-white transition-colors">Bade'e Al Oud Collection</Link>
-              <Link to="/collections/medix" className="hover:text-white transition-colors">Medix 5.5 Body Care Collection</Link>
-            </div>
           </div>
 
           {/* Location & Delivery */}

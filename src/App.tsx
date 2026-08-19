@@ -4,6 +4,7 @@ import NineCollectionApp from './pages/nine-collection/App';
 import HawasApp from './pages/hawas/App';
 import CeraveApp from './pages/cerave/App';
 import BadeeAlOudApp from './pages/badee-al-oud/App';
+import MedixApp from './pages/medix/App';
 import AdminApp from './pages/admin/App';
 import AccountApp from './pages/account/App';
 
@@ -35,6 +36,7 @@ export default function App() {
       <Route path="/collections/hawas" element={<HawasApp />} />
       <Route path="/collections/cerave" element={<CeraveApp />} />
       <Route path="/collections/badee-al-oud" element={<BadeeAlOudApp />} />
+      <Route path="/collections/medix" element={<MedixApp />} />
       <Route path="/account" element={<AccountApp />} />
     </Routes>
   );

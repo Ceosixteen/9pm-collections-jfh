@@ -8,6 +8,7 @@ const COLLECTION_PATHS: Record<string, string> = {
   hawas: '/collections/hawas',
   cerave: '/collections/cerave',
   'badee-al-oud': '/collections/badee-al-oud',
+  medix: '/collections/medix',
 };
 
 const COLLECTION_BADGE_COLORS: Record<string, string> = {
@@ -15,6 +16,7 @@ const COLLECTION_BADGE_COLORS: Record<string, string> = {
   hawas: 'bg-blue-900 text-white',
   cerave: 'bg-teal-700 text-white',
   'badee-al-oud': 'bg-amber-900 text-white',
+  medix: 'bg-purple-800 text-white',
 };
 
 interface HomeProductModalProps {

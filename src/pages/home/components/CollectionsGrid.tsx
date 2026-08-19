@@ -39,6 +39,13 @@ const COLLECTIONS: CollectionCard[] = [
     image: '/images/oud_black.png',
     badge: 'Fragrances',
   },
+  {
+    to: '/collections/medix',
+    name: 'Medix 5.5 Body Care Collection',
+    subtitle: 'Vitamin C, Argan Oil, Retinol & Hyaluronic Body Lotions',
+    image: '/images/medix_placeholder.svg',
+    badge: 'Body Care',
+  },
 ];
 
 export const CollectionsGrid: React.FC = () => {

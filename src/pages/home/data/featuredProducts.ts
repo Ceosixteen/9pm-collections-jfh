@@ -241,4 +241,18 @@ export const NEW_ARRIVALS: HomeProduct[] = [
     collectionLabel: 'The 9 Collection',
     category: 'fragrance',
   },
+  {
+    id: 'medix-vitc-turmeric-lotion',
+    name: 'Medix 5.5 Vitamin C + Turmeric Body Lotion',
+    tagline: 'The Ultimate Glow-Restorer for Dull, Sun-Damaged Skin',
+    description: 'Packed with brightening Vitamin C and antioxidant-rich turmeric, this body lotion fades sun damage, targets dark spots, and evens out skin tone while leaving you with a luminous finish.',
+    notes: '🧪 Key Ingredients: Vitamin C · Turmeric · Antioxidant Complex · Suitable for: Dull, Sun-Damaged Skin',
+    priceUSD: 25,
+    originalPriceUSD: 25,
+    image: '/images/medix_placeholder.svg',
+    badge: '✨ New — Full-Body Radiance',
+    collectionSlug: 'medix',
+    collectionLabel: 'Medix 5.5 Body Care',
+    category: 'skincare',
+  },
 ];

@@ -9,6 +9,7 @@ import * as nineCollectionCatalog from './catalogs/nineCollection.js';
 import * as hawasCatalog from './catalogs/hawas.js';
 import * as ceraveCatalog from './catalogs/cerave.js';
 import * as badeeAlOudCatalog from './catalogs/badeeAlOud.js';
+import * as medixCatalog from './catalogs/medix.js';
 
 // In-app notification shown to signed-in customers on /account — either an
 // admin-composed broadcast campaign, or an automatic note tied to one order
@@ -462,6 +463,7 @@ const CATALOGS: Record<string, Catalog> = {
   hawas: hawasCatalog,
   cerave: ceraveCatalog,
   'badee-al-oud': badeeAlOudCatalog,
+  medix: medixCatalog,
 };
 
 function resolveCatalog(storeSlug?: string): Catalog {

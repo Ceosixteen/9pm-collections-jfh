@@ -1,23 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ShoppingBag, X } from 'lucide-react';
+import { PERFUMES_DATA } from '../data/lotionsData';
 
-// A representative mix of real products across all four collections, so the
-// homepage notification isn't tied to importing every collection's full
-// catalog just for this.
-const PRODUCTS = [
-  '9PM Rebel by Afnan',
-  '9AM Dive by Afnan',
-  '9PM Pour Femme by Afnan',
-  'Hawas for Him by Rasasi',
-  'Hawas Black by Rasasi',
-  "Bade'e Al Oud Black",
-  "Bade'e Al Oud Noble Blush",
-  'CeraVe Foaming Facial Cleanser',
-  'CeraVe Resurfacing Retinol Serum',
-  'Medix 5.5 Vitamin C + Turmeric Body Lotion',
-  'Medix 5.5 Argan Oil + Vitamin E Body Cream',
-];
-
+// Real Juba neighborhoods we deliver to — reused consistently with the
+// review data elsewhere on the site.
 const AREAS = [
   'Munuki', 'Gudele', 'Tongping', 'Hai Cinema', 'Juba Town', 'Thongpiny',
   'Custom Market', 'Konyo Konyo', 'Jebel', 'Atlabara', 'Nyakuron', 'New Site',
@@ -25,11 +11,13 @@ const AREAS = [
 
 function buildOrderFeed() {
   const combos: { product: string; area: string }[] = [];
-  PRODUCTS.forEach((product, idx) => {
+  PERFUMES_DATA.forEach((p, idx) => {
+    // Pair each product with a few different areas for variety.
     [0, 1, 2].forEach((offset) => {
-      combos.push({ product, area: AREAS[(idx * 3 + offset) % AREAS.length] });
+      combos.push({ product: p.name, area: AREAS[(idx * 3 + offset) % AREAS.length] });
     });
   });
+  // Shuffle once so the order isn't the same every page load.
   for (let i = combos.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [combos[i], combos[j]] = [combos[j], combos[i]];
