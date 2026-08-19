@@ -247,7 +247,7 @@ META DESCRIPTION: ${scraped.description || 'unknown'}
 DETECTED PRICE: ${scraped.price ?? 'unknown'}
 PAGE TEXT EXCERPT: ${scraped.bodyText || '(no readable text found — this page may require JavaScript to render)'}`;
 
-  const raw = await callGroq(IMPORT_EXTRACTION_PROMPT, userPrompt, 0.4, 'llama-3.3-70b-versatile');
+  const raw = await callGroqWithFallback(IMPORT_EXTRACTION_PROMPT, userPrompt, 0.4);
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
   const parsed = JSON.parse(cleaned);
 
@@ -576,6 +576,20 @@ async function callGroq(
   return text;
 }
 
+// Groq's model lineup rotates (models get deprecated/decommissioned), so a
+// single hardcoded model is a single point of failure — this is the same
+// primary/backup pattern already proven for the customer chat widget below,
+// shared here so other Groq call sites (URL import, Alex) don't each need
+// their own try/catch duplicate of it.
+async function callGroqWithFallback(systemInstruction: string, userContent: string, temperature: number): Promise<string> {
+  try {
+    return await callGroq(systemInstruction, userContent, temperature, 'llama-3.3-70b-versatile');
+  } catch (e1) {
+    console.warn('Groq llama-3.3-70b-versatile failed, trying llama-3.1-8b-instant:', e1);
+    return callGroq(systemInstruction, userContent, temperature, 'llama-3.1-8b-instant');
+  }
+}
+
 // Extracts the JSON payload following a "[TAGNAME: {...}]" marker without
 // assuming the model closed it perfectly. Groq/Llama sometimes malforms or
 // duplicates trailing structure (unlike Gemini, which was reliable here), so
@@ -864,7 +878,7 @@ INSTRUCTIONS FOR ALEX:
 `;
 
   try {
-    const text = await callGroq(alexSystemPrompt, `Admin query: "${incomingText}"`, 0.5, 'llama-3.3-70b-versatile');
+    const text = await callGroqWithFallback(alexSystemPrompt, `Admin query: "${incomingText}"`, 0.5);
     if (text && text.trim()) {
       return text.trim();
     }
@@ -965,15 +979,10 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       let responseText = '';
 
       try {
-        responseText = await callGroq(systemInstruction, promptText, 0.7, 'llama-3.3-70b-versatile');
-      } catch (e1) {
-        console.warn('Groq llama-3.3-70b-versatile failed, trying llama-3.1-8b-instant:', e1);
-        try {
-          responseText = await callGroq(systemInstruction, promptText, 0.7, 'llama-3.1-8b-instant');
-        } catch (e2) {
-          console.warn('Groq llama-3.1-8b-instant failed, using smart fallback engine:', e2);
-          responseText = catalog.generateSmartFallbackResponse(message, selectedCurrency);
-        }
+        responseText = await callGroqWithFallback(systemInstruction, promptText, 0.7);
+      } catch (e) {
+        console.warn('Both Groq models failed, using smart fallback engine:', e);
+        responseText = catalog.generateSmartFallbackResponse(message, selectedCurrency);
       }
 
       if (!responseText) {
@@ -1360,7 +1369,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       if (!product.name || !product.collectionSlug) {
         return res.status(400).json({ error: 'name and collectionSlug are required' });
       }
-      await setDoc(doc(db, 'products', product.id), product);
+      await setDoc(doc(db, 'products', product.id), stripUndefined(product));
       return res.json({ success: true, product });
     } catch (err: any) {
       console.error('Error saving product:', err);
@@ -1384,7 +1393,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
             failed.push({ name: raw?.name, error: 'Missing name or collectionSlug' });
             continue;
           }
-          await setDoc(doc(db, 'products', product.id), product);
+          await setDoc(doc(db, 'products', product.id), stripUndefined(product));
           saved.push(product);
         } catch (e: any) {
           failed.push({ name: raw?.name, error: e?.message || String(e) });
@@ -1420,7 +1429,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       const settled = await Promise.allSettled(
         cleanUrls.map(async (url) => {
           const product = await buildDraftProductFromUrl(url, collectionSlug);
-          await setDoc(doc(db, 'products', product.id), product);
+          await setDoc(doc(db, 'products', product.id), stripUndefined(product));
           return product;
         })
       );
@@ -1505,7 +1514,7 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
       if (!coll.label || !coll.routeSlug) {
         return res.status(400).json({ error: 'label and routeSlug are required' });
       }
-      await setDoc(doc(db, 'collections', coll.id), coll);
+      await setDoc(doc(db, 'collections', coll.id), stripUndefined(coll));
       return res.json({ success: true, collection: coll });
     } catch (err: any) {
       console.error('Error saving collection:', err);
