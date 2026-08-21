@@ -265,7 +265,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         {item.product.name}
                       </h4>
                       <p className="text-[10px] text-gray-500 truncate">
-                        {item.product.timeTag === 'HYDRATE' ? 'Hydrate & Soothe' : 'Brighten & Firm'} · {item.product.volume}
+                        {item.product.fragranceFamily || 'Body Care'} · {item.product.volume}
                       </p>
                       <p className="text-xs font-extrabold text-[#B24BF3] mt-1">
                         {formatMoney(item.unitPriceUSD * item.quantity, item.unitPriceSSP * item.quantity)}

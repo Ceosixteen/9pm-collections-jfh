@@ -6,8 +6,8 @@ export const DeliverySteps: React.FC = () => {
     {
       step: "01",
       icon: ShoppingBag,
-      title: "1. Select Your Body Treatment",
-      desc: "Choose from Vitamin C + Turmeric, Argan Oil + Vitamin E, Retinol + Ferulic Acid, or Hyaluronic Acid + Cica. Bundle 2+ products for automatic -$5 off every item!"
+      title: "1. Select Your Shower Gel",
+      desc: "Choose the Nivea Men formula that matches your skin and freshness needs, then bundle 2+ products for automatic savings."
     },
     {
       step: "02",

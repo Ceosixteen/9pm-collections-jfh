@@ -11,7 +11,9 @@
 set -e
 
 echo "🏗  Building and deploying to Vercel production..."
-DEPLOY_URL=$(npx vercel --prod --yes 2>&1 | grep -Eo 'https://9pm-collections-[a-z0-9]+-asai2\.vercel\.app' | tail -1)
+DEPLOY_OUTPUT=$(npx vercel --prod --yes 2>&1)
+echo "$DEPLOY_OUTPUT"
+DEPLOY_URL=$(printf '%s\n' "$DEPLOY_OUTPUT" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -1)
 
 if [ -z "$DEPLOY_URL" ]; then
   echo "❌ Could not determine deployment URL. Check Vercel output above."

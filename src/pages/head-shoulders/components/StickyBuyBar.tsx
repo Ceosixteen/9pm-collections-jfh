@@ -41,7 +41,7 @@ export const StickyBuyBar: React.FC<StickyBuyBarProps> = ({
             className="px-3.5 py-2 rounded-full bg-gray-100 text-slate-900 hover:bg-gray-200 border border-gray-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
           >
             <Flame className="w-3.5 h-3.5 text-[#B24BF3]" />
-            <span className="hidden sm:inline">Add Best Seller (Vitamin C Lotion)</span>
+            <span className="hidden sm:inline">Add Best Seller (Silk & Smooth)</span>
             <span className="sm:hidden">Quick Add</span>
           </button>
 

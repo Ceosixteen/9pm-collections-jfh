@@ -26,7 +26,7 @@ export const BundlesSection: React.FC<BundlesSectionProps> = ({
             AUTOMATIC BUNDLE DISCOUNTS
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight font-sans">
-            Special Body Care Bundle Deals
+            Special Dove Bundle Deals
           </h2>
           <p className="text-sm sm:text-base text-slate-600 font-normal">
             Save up to <strong className="text-[#B24BF3] font-bold">$20 USD (160,000 SSP)</strong> when you bundle multiple products together. Instant same-day delivery across Juba Town!
@@ -93,7 +93,7 @@ export const BundlesSection: React.FC<BundlesSectionProps> = ({
                           />
                           <div className="min-w-0">
                             <span className="text-xs font-bold text-slate-900 block truncate">{p.name}</span>
-                            <span className="text-[10px] text-gray-500 block truncate">{p.timeTag === 'HYDRATE' ? 'Hydrate & Soothe' : 'Brighten & Firm'}</span>
+                            <span className="text-[10px] text-gray-500 block truncate">{p.fragranceFamily || 'Bath & Body'}</span>
                           </div>
                         </div>
                       ))}

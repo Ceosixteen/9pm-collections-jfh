@@ -26,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const categories = [
     { id: 'medix', label: 'Dove Beauty Bar Body Care' },
-    { id: 'bundles', label: 'Body Care Bundles' },
+    { id: 'bundles', label: 'Dove Bundles' },
   ];
 
   return (
