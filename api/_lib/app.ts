@@ -458,9 +458,26 @@ function normalizeCollection(raw: any): StoredCollection {
   };
 }
 
+interface CatalogProduct {
+  id: string;
+  name: string;
+  priceUSD: number;
+  priceSSP: number;
+  tagline?: string;
+  description?: string;
+  notesTop?: string[];
+  notesMiddle?: string[];
+  notesBase?: string[];
+  fragranceFamily?: string;
+  bestTimeToWear?: string;
+  projection?: string;
+  longevity?: string;
+  stockCount?: number;
+}
+
 interface Catalog {
   label: string;
-  perfumesData: readonly { id: string; name: string; priceUSD: number; priceSSP: number }[];
+  perfumesData: readonly CatalogProduct[];
   systemInstruction: string;
   generateSmartFallbackResponse: (userText: string, currency: string) => string;
 }
@@ -470,11 +487,42 @@ function makeSalesCatalog(
   products: Catalog['perfumesData'],
   productType: string
 ): Catalog {
-  const productList = products.map((p) => `${p.name} ($${p.priceUSD}, ID: ${p.id})`).join('\n');
+  const productList = products.map((p) => {
+    const details = [
+      p.tagline,
+      p.description,
+      p.fragranceFamily ? `Family/type: ${p.fragranceFamily}` : '',
+      p.notesTop?.length ? `Top/key ingredients: ${p.notesTop.join(', ')}` : '',
+      p.notesMiddle?.length ? `Middle/benefits: ${p.notesMiddle.join(', ')}` : '',
+      p.notesBase?.length ? `Base/result: ${p.notesBase.join(', ')}` : '',
+      p.bestTimeToWear ? `Best use: ${p.bestTimeToWear}` : '',
+      p.projection ? `Projection/effect: ${p.projection}` : '',
+      p.longevity ? `Longevity: ${p.longevity}` : '',
+      typeof p.stockCount === 'number' ? `Stock: ${p.stockCount}` : '',
+    ].filter(Boolean).join(' | ');
+    return `- ${p.name} — $${p.priceUSD} / ${p.priceSSP.toLocaleString()} SSP — ID: ${p.id}${details ? ` | ${details}` : ''}`;
+  }).join('\n');
   return {
     label,
     perfumesData: products,
-    systemInstruction: `You are Amina, a warm, concise member of the Juba Fashion Hub sales team in Juba, South Sudan. Help customers choose from the ${label}. Keep replies to 2-3 short sentences, never use bold formatting, and ask what result or occasion they need. Products:\n${productList}\nWe deliver free across Juba within 120 minutes. Payment options are cash on delivery, bank transfer, or m-GURUSH. If recommending, append [RECOMMEND: product_id]. If the customer is ready to order, collect name, phone, delivery address, payment method and items, then append a valid [CREATE_ORDER: {...}] tag using the listed product IDs.`,
+    systemInstruction: `You are Amina, a warm, knowledgeable and concise human member of the Juba Fashion Hub sales team in Juba, South Sudan. You are helping a shopper on the ${label} page.
+
+RECOMMENDATION CONVERSATION RULES:
+- When a shopper asks for a recommendation, "the best", "which one", a gift, or says they are unsure, do not guess immediately unless their message already gives enough detail.
+- First ask 1 or 2 short, relevant questions. For fragrance ask about recipient, preferred vibe/notes, occasion or day/night use, and budget. For skincare/body/hair products ask about their main concern, skin or hair type/sensitivity, desired result, and budget.
+- Use the previous chat context. Never repeat a question the shopper already answered.
+- Once you have enough information, recommend at most 2 strong matches and briefly explain why each fits. Never invent a product or benefit.
+- Keep ordinary replies to 2-4 short sentences, use plain text only, and sound helpful rather than pushy.
+
+LIVE ACTIVE PRODUCTS IN THIS COLLECTION:
+${productList}
+
+STORE RULES:
+- Prices and availability above are current. Only recommend listed products with stock above 0.
+- We deliver free across Juba within 120 minutes.
+- Payment options are cash on delivery, bank transfer, or m-GURUSH.
+- When giving a final product recommendation, append exactly one [RECOMMEND: product_id] tag for the strongest match.
+- If the customer is ready to order, collect name, phone, delivery address, payment method and items, then append a valid [CREATE_ORDER: {...}] tag using only the listed product IDs.`,
     generateSmartFallbackResponse: (userText: string, currency: string) => {
       const queryText = userText.toLowerCase();
       const matched = products.find((p) => queryText.includes(p.name.toLowerCase())) || products[0];
@@ -483,6 +531,13 @@ function makeSalesCatalog(
       }
       if (queryText.includes('price') || queryText.includes('cost')) {
         return `${label} prices start from ${currency === 'SSP' ? `${matched.priceSSP.toLocaleString()} SSP` : `$${matched.priceUSD}`}. Tell me what you need and I will help you choose the best option.`;
+      }
+      const isRecommendation = /recommend|which|best|suggest|choose|gift|not sure|unsure|what should/i.test(queryText);
+      if (isRecommendation) {
+        const isFragrance = /fragrance|perfume|scent/i.test(productType);
+        return isFragrance
+          ? `I can help you find the right match. Is it for you or a gift, and do you want something fresh for daytime or bold for evenings? What budget should I stay within?`
+          : `I can help you choose the right ${productType}. What is your main concern or result you want, and do you have sensitive skin or a budget limit?`;
       }
       return `Jambo! I can help you choose the right ${productType} from ${label}. What result, style, or occasion are you shopping for?`;
     },
@@ -504,8 +559,37 @@ const CATALOGS: Record<string, Catalog> = {
   'signature-women': makeSalesCatalog('Signature Fragrances for Women', signatureWomenProducts, 'fragrance'),
 };
 
-function resolveCatalog(storeSlug?: string): Catalog {
-  return (storeSlug && CATALOGS[storeSlug]) || nineCollectionCatalog;
+const LIVE_CATALOG_META: Record<string, { label: string; productType: string }> = {
+  'nine-collection': { label: 'The 9 Collection', productType: 'fragrance' },
+  hawas: { label: 'Rasasi Hawas Collection', productType: 'fragrance' },
+  cerave: { label: 'CeraVe Skincare Collection', productType: 'skincare product' },
+  'badee-al-oud': { label: "Bade'e Al Oud Collection", productType: 'fragrance' },
+  medix: { label: 'Medix 5.5 Body Care Collection', productType: 'body care product' },
+  'head-shoulders': { label: 'Head & Shoulders Anti-Dandruff Collection', productType: 'hair care product' },
+  'nivea-shower-gel': { label: 'Nivea Men Shower Gel Collection', productType: 'shower gel' },
+  khamrah: { label: 'Lattafa Khamrah Collection', productType: 'fragrance' },
+  'signature-men': { label: 'Signature Fragrances for Men', productType: 'fragrance' },
+  'nivea-face-wash': { label: 'Nivea Men Face Wash Collection', productType: 'face wash' },
+  'dove-soap': { label: 'Dove Beauty Bar Collection', productType: 'beauty bar' },
+  'signature-women': { label: 'Signature Fragrances for Women', productType: 'fragrance' },
+};
+
+async function resolveCatalog(storeSlug?: string): Promise<Catalog> {
+  const slug = storeSlug && LIVE_CATALOG_META[storeSlug] ? storeSlug : 'nine-collection';
+  try {
+    const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
+    const products = snapshot.docs
+      .map((item) => item.data() as StoredProduct)
+      .filter((product) => product.collectionSlug === slug && product.isActive !== false && (product.stockCount ?? 1) > 0)
+      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+    if (products.length > 0) {
+      const meta = LIVE_CATALOG_META[slug];
+      return makeSalesCatalog(meta.label, products, meta.productType);
+    }
+  } catch (error) {
+    console.warn(`Could not load live Amina catalogue for ${slug}; using bundled fallback:`, error);
+  }
+  return CATALOGS[slug] || nineCollectionCatalog;
 }
 
 // --- Admin authentication -------------------------------------------------
@@ -1003,7 +1087,7 @@ export function createApp(): express.Express {
         return res.status(400).json({ error: 'Message is required' });
       }
 
-      const catalog = resolveCatalog(storeSlug);
+      const catalog = await resolveCatalog(storeSlug);
 
       // System Prompt for Amina - Sales Team Concierge (per-collection persona)
       const systemInstruction = catalog.systemInstruction;
