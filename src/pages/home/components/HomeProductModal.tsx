@@ -98,9 +98,11 @@ export const HomeProductModal: React.FC<HomeProductModalProps> = ({ product, onC
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-black text-[#B24BF3]">${product.priceUSD}</span>
             <span className="text-sm text-slate-400 line-through">${product.originalPriceUSD}</span>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-              Save ${product.originalPriceUSD - product.priceUSD}
-            </span>
+            {product.originalPriceUSD > product.priceUSD && (
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                Save ${product.originalPriceUSD - product.priceUSD}
+              </span>
+            )}
           </div>
 
           {/* Description */}
@@ -109,7 +111,7 @@ export const HomeProductModal: React.FC<HomeProductModalProps> = ({ product, onC
           {/* Notes / Ingredients */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-gray-100">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
-              {product.category === 'skincare' ? 'Key Ingredients' : 'Fragrance Notes'}
+              {product.category === 'fragrance' ? 'Fragrance Notes' : 'Key Benefits & Ingredients'}
             </p>
             <p className="text-xs text-slate-700 leading-relaxed font-medium">{product.notes}</p>
           </div>

@@ -10,7 +10,7 @@ export interface HomeProduct {
   badge: string;
   collectionSlug: string;
   collectionLabel: string;
-  category: 'fragrance' | 'skincare';
+  category: 'fragrance' | 'skincare' | 'bodycare' | 'grooming' | 'haircare';
 }
 
 export const BEST_SELLERS: HomeProduct[] = [

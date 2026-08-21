@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { HomeProduct, BEST_SELLERS, NEW_ARRIVALS } from '../data/featuredProducts';
@@ -18,6 +18,73 @@ const COLLECTION_COLORS: Record<string, string> = {
   'dove-soap': 'bg-sky-700 text-white',
   'signature-women': 'bg-rose-700 text-white',
 };
+
+const COLLECTION_LABELS: Record<string, string> = {
+  'nine-collection': 'The 9 Collection',
+  hawas: 'Rasasi Hawas',
+  cerave: 'CeraVe Skincare',
+  'badee-al-oud': "Bade'e Al Oud",
+  medix: 'Medix 5.5 Body Care',
+  'head-shoulders': 'Head & Shoulders',
+  'nivea-shower-gel': 'Nivea Men Shower Gels',
+  khamrah: 'Lattafa Khamrah',
+  'signature-men': "Men's Signature Fragrances",
+  'nivea-face-wash': 'Nivea Men Face Wash',
+  'dove-soap': 'Dove Beauty Bars',
+  'signature-women': "Women's Signature Fragrances",
+};
+
+const FRAGRANCE_COLLECTIONS = new Set([
+  'nine-collection', 'hawas', 'badee-al-oud', 'khamrah', 'signature-men', 'signature-women',
+]);
+const SKIN_BODY_COLLECTIONS = new Set(['cerave', 'medix', 'dove-soap']);
+const GROOMING_COLLECTIONS = new Set(['nivea-face-wash', 'nivea-shower-gel']);
+
+interface ApiProduct {
+  id: string;
+  name: string;
+  tagline?: string;
+  description?: string;
+  priceUSD: number;
+  originalPriceUSD?: number;
+  image?: string;
+  badge?: string;
+  collectionSlug: string;
+  isBestSeller?: boolean;
+  notesTop?: string[];
+  notesMiddle?: string[];
+  notesBase?: string[];
+}
+
+function toHomeProduct(product: ApiProduct): HomeProduct {
+  const isFragrance = FRAGRANCE_COLLECTIONS.has(product.collectionSlug);
+  const isHairCare = product.collectionSlug === 'head-shoulders';
+  const category: HomeProduct['category'] = isFragrance
+    ? 'fragrance'
+    : isHairCare
+      ? 'haircare'
+      : GROOMING_COLLECTIONS.has(product.collectionSlug)
+        ? 'grooming'
+        : product.collectionSlug === 'medix' || product.collectionSlug === 'dove-soap'
+          ? 'bodycare'
+          : 'skincare';
+  const notes = [...(product.notesTop || []), ...(product.notesMiddle || []), ...(product.notesBase || [])];
+
+  return {
+    id: product.id,
+    name: product.name,
+    tagline: product.tagline || 'Authentic imported care, available in Juba',
+    description: product.description || product.tagline || 'Shop this authentic product from Juba Fashion Hub.',
+    notes: notes.length ? notes.join(' · ') : 'Authentic imported product · Carefully selected by Juba Fashion Hub',
+    priceUSD: Number(product.priceUSD || 0),
+    originalPriceUSD: Number(product.originalPriceUSD || product.priceUSD || 0),
+    image: product.image || '/images/juba_fashion_hub_logo.jpg',
+    badge: product.badge || (product.isBestSeller ? '🔥 Best Seller' : '✨ Available Now'),
+    collectionSlug: product.collectionSlug,
+    collectionLabel: COLLECTION_LABELS[product.collectionSlug] || product.collectionSlug,
+    category,
+  };
+}
 
 function ProductCard({
   product,
@@ -78,6 +145,7 @@ function ProductRow({
   viewAllHref,
   onTap,
 }: {
+  key?: string;
   title: string;
   emoji: string;
   subtitle: string;
@@ -123,6 +191,43 @@ function ProductRow({
 
 export const ProductShowcase: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<HomeProduct | null>(null);
+  const [catalogue, setCatalogue] = useState<HomeProduct[]>([]);
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then((response) => (response.ok ? response.json() : []))
+      .then((products: ApiProduct[]) => {
+        if (Array.isArray(products)) setCatalogue(products.map(toHomeProduct));
+      })
+      .catch(() => {});
+  }, []);
+
+  const categoryRows = useMemo(() => [
+    {
+      title: 'Perfumes & Fragrances',
+      emoji: '🌹',
+      subtitle: 'Signature scents for women and men — from fresh daytime sprays to deep evening oud',
+      products: catalogue.filter((product) => FRAGRANCE_COLLECTIONS.has(product.collectionSlug)),
+    },
+    {
+      title: 'Skin & Body Care',
+      emoji: '✨',
+      subtitle: 'Cleansers, treatment lotions and nourishing beauty bars for everyday care',
+      products: catalogue.filter((product) => SKIN_BODY_COLLECTIONS.has(product.collectionSlug)),
+    },
+    {
+      title: "Men's Grooming",
+      emoji: '🧔🏿',
+      subtitle: 'Face washes and shower gels made for freshness, oil control and daily confidence',
+      products: catalogue.filter((product) => GROOMING_COLLECTIONS.has(product.collectionSlug)),
+    },
+    {
+      title: 'Hair & Scalp Care',
+      emoji: '🫧',
+      subtitle: 'Anti-dandruff shampoos for cleaner roots, smoother hair and flake-free confidence',
+      products: catalogue.filter((product) => product.collectionSlug === 'head-shoulders'),
+    },
+  ].filter((row) => row.products.length > 0), [catalogue]);
 
   return (
     <section className="py-10 sm:py-14 space-y-10 sm:space-y-14 bg-[#FAF8FC]">
@@ -133,6 +238,29 @@ export const ProductShowcase: React.FC = () => {
         products={BEST_SELLERS}
         onTap={setSelectedProduct}
       />
+
+      {categoryRows.length > 0 && (
+        <div className="pt-2 space-y-10 sm:space-y-14">
+          <div className="text-center px-4">
+            <span className="inline-flex px-3 py-1 rounded-full bg-purple-100 text-[#B24BF3] text-[10px] sm:text-xs font-black uppercase tracking-widest mb-3">
+              Shop Every Product
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-black text-slate-900">Browse by Category</h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-2">Tap any item for full details and quick add-to-cart.</p>
+          </div>
+
+          {categoryRows.map((row) => (
+            <ProductRow
+              key={row.title}
+              emoji={row.emoji}
+              title={row.title}
+              subtitle={row.subtitle}
+              products={row.products}
+              onTap={setSelectedProduct}
+            />
+          ))}
+        </div>
+      )}
       <ProductRow
         emoji="✨"
         title="New Arrivals"
