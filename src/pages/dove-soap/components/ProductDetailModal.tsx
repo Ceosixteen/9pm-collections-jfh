@@ -45,7 +45,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <img
                 src={perfume.image}
                 alt={perfume.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain p-4 sm:p-6"
                 referrerPolicy="no-referrer"
               />
               <span className="absolute top-3 left-3 px-3 py-1 bg-slate-900 text-white text-xs font-bold rounded-full shadow-md uppercase">

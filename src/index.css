@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+.jfh-image-fallback {
+  object-fit: contain !important;
+  padding: 1.5rem;
+  opacity: 0.45;
+}
+
 @layer base {
   :root {
     --purple-primary: #B24BF3;

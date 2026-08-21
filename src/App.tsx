@@ -14,6 +14,7 @@ import DoveSoapApp from './pages/dove-soap/App';
 import SignatureWomenApp from './pages/signature-women/App';
 import AdminApp from './pages/admin/App';
 import AccountApp from './pages/account/App';
+import { ImageRecovery } from './components/ImageRecovery';
 
 export default function App() {
   // The admin back office is served from its own subdomain
@@ -37,21 +38,24 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<HomeApp />} />
-      <Route path="/collections/9pm" element={<NineCollectionApp />} />
-      <Route path="/collections/hawas" element={<HawasApp />} />
-      <Route path="/collections/cerave" element={<CeraveApp />} />
-      <Route path="/collections/badee-al-oud" element={<BadeeAlOudApp />} />
-      <Route path="/collections/medix" element={<MedixApp />} />
-      <Route path="/collections/head-shoulders" element={<HeadShouldersApp />} />
-      <Route path="/collections/nivea-shower-gel" element={<NiveaShowerGelApp />} />
-      <Route path="/collections/khamrah" element={<KhamrahApp />} />
-      <Route path="/collections/signature-men" element={<SignatureMenApp />} />
-      <Route path="/collections/nivea-face-wash" element={<NiveaFaceWashApp />} />
-      <Route path="/collections/dove-beauty-bars" element={<DoveSoapApp />} />
-      <Route path="/collections/signature-women" element={<SignatureWomenApp />} />
-      <Route path="/account" element={<AccountApp />} />
-    </Routes>
+    <>
+      <ImageRecovery />
+      <Routes>
+        <Route path="/" element={<HomeApp />} />
+        <Route path="/collections/9pm" element={<NineCollectionApp />} />
+        <Route path="/collections/hawas" element={<HawasApp />} />
+        <Route path="/collections/cerave" element={<CeraveApp />} />
+        <Route path="/collections/badee-al-oud" element={<BadeeAlOudApp />} />
+        <Route path="/collections/medix" element={<MedixApp />} />
+        <Route path="/collections/head-shoulders" element={<HeadShouldersApp />} />
+        <Route path="/collections/nivea-shower-gel" element={<NiveaShowerGelApp />} />
+        <Route path="/collections/khamrah" element={<KhamrahApp />} />
+        <Route path="/collections/signature-men" element={<SignatureMenApp />} />
+        <Route path="/collections/nivea-face-wash" element={<NiveaFaceWashApp />} />
+        <Route path="/collections/dove-beauty-bars" element={<DoveSoapApp />} />
+        <Route path="/collections/signature-women" element={<SignatureWomenApp />} />
+        <Route path="/account" element={<AccountApp />} />
+      </Routes>
+    </>
   );
 }
