@@ -30,6 +30,11 @@ const CARE_PAGES: Record<string, string> = {
   'medix-argan-vite-cream': 'https://medix55.com/products/argan-vitamin-e',
   'medix-retinol-ferulic-cream': 'https://medix55.com/products/retinol-ferulic-acid',
   'medix-hyaluronic-cica-cream': 'https://medix55.com/products/hyaluronic-cica-extract',
+  'men-al-ameed': 'https://www.oriental-style.de/en/products/al-ameed-lattafa',
+  'men-qaed': 'https://www.lattafaindia.com/products/qaaed',
+  'men-al-areeq': 'https://www.lattafa-usa.com/products/al-areeq-gold',
+  'sig-al-nashama': 'https://www.lattafa-usa.com/products/al-nashama',
+  'dove-cocoa-butter-beauty-bar': 'https://www.dove.com/us/en/p/restoring-beauty-bar.html/00011111347847',
 };
 
 const DIRECT_IMAGES: Record<string, { image: string; page: string }> = {
@@ -67,9 +72,12 @@ const SEARCH_OVERRIDES: Record<string, string> = {
   'men-rave-now-black': 'Rave Now',
   'sig-rave-now-for-her': 'Rave Now women',
   'sig-teriaq-pink': 'Teriaq',
+  'men-al-noble-safir': 'Al Noble Safeer',
+  'sig-fakhar-white': 'Fakhar Lattafa Women',
+  'sig-shaheen': 'Shaheen Gold',
 };
 
-const RESET_IDS = new Set(['men-al-ameed', 'men-al-areeq']);
+const RESET_IDS = new Set<string>();
 
 function decodeHtml(value: string) {
   return value.replace(/&amp;/g, '&').replace(/&#038;/g, '&').replace(/&quot;/g, '"');
