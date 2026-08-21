@@ -26,6 +26,10 @@ const CARE_PAGES: Record<string, string> = {
   'men-liam-lattafa': 'https://lattafapakistan.com/products/liam-for-men-women-100ml-perfume',
   'sig-yara-pink': 'https://www.walmart.com/ip/Lattafa-Yara-for-Women-Eau-De-Parfum-Spray-3-40-Ounce-100-Ml-Pink-100ML/11872605527',
   'sig-mayar-blue': 'https://www.lattafa-usa.com/products/mayar-natural-intense',
+  'medix-vitc-turmeric-lotion': 'https://medix55.com/products/vitamin-c-turmeric',
+  'medix-argan-vite-cream': 'https://medix55.com/products/argan-vitamin-e',
+  'medix-retinol-ferulic-cream': 'https://medix55.com/products/retinol-ferulic-acid',
+  'medix-hyaluronic-cica-cream': 'https://medix55.com/products/hyaluronic-cica-extract',
 };
 
 const DIRECT_IMAGES: Record<string, { image: string; page: string }> = {
@@ -45,7 +49,7 @@ const DIRECT_IMAGES: Record<string, { image: string; page: string }> = {
 
 const TARGET_COLLECTIONS = new Set([
   'nivea-face-wash', 'nivea-shower-gel', 'dove-soap', 'head-shoulders',
-  'khamrah', 'signature-men', 'signature-women',
+  'khamrah', 'signature-men', 'signature-women', 'medix',
 ]);
 
 const REUSE_PRODUCT_IDS: Record<string, string> = {

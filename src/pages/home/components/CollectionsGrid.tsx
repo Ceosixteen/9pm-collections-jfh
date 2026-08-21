@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 
 interface CollectionCard {
+  slug: string;
   to: string;
   name: string;
   subtitle: string;
@@ -12,6 +13,7 @@ interface CollectionCard {
 
 const COLLECTIONS: CollectionCard[] = [
   {
+    slug: 'nine-collection',
     to: '/collections/9pm',
     name: 'The 9 Collection',
     subtitle: 'Afnan 9PM Rebel, Elixir, Classic, 9AM Dive & Pour Femme',
@@ -19,6 +21,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Fragrances',
   },
   {
+    slug: 'hawas',
     to: '/collections/hawas',
     name: 'Rasasi Hawas Collection',
     subtitle: 'Hawas for Him, Ice, Black, Fire & Pink',
@@ -26,6 +29,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Fragrances',
   },
   {
+    slug: 'cerave',
     to: '/collections/cerave',
     name: 'CeraVe Skincare Collection',
     subtitle: 'Cleansers, toner, moisturizers & retinol serum',
@@ -33,6 +37,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Skincare',
   },
   {
+    slug: 'badee-al-oud',
     to: '/collections/badee-al-oud',
     name: "Bade'e Al Oud Collection",
     subtitle: 'Lattafa Black, Amethyst, Sublime, Noble Blush & White',
@@ -40,6 +45,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Fragrances',
   },
   {
+    slug: 'medix',
     to: '/collections/medix',
     name: 'Medix 5.5 Body Care Collection',
     subtitle: 'Vitamin C, Argan Oil, Retinol & Hyaluronic Body Lotions',
@@ -47,6 +53,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Body Care',
   },
   {
+    slug: 'nivea-face-wash',
     to: '/collections/nivea-face-wash',
     name: 'Nivea Men Face Wash',
     subtitle: 'Dark Spot Reduction, Deep Impact & All-In-1 Charcoal',
@@ -54,6 +61,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Face Care',
   },
   {
+    slug: 'dove-soap',
     to: '/collections/dove-beauty-bars',
     name: 'Dove Beauty Bar Collection',
     subtitle: 'Original, Pink, Serum & Cocoa Butter Beauty Bars',
@@ -61,6 +69,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Bath & Body',
   },
   {
+    slug: 'head-shoulders',
     to: '/collections/head-shoulders',
     name: 'Head & Shoulders Collection',
     subtitle: 'Anti-dandruff care for smooth, clean and fuller-looking hair',
@@ -68,6 +77,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Hair Care',
   },
   {
+    slug: 'nivea-shower-gel',
     to: '/collections/nivea-shower-gel',
     name: 'Nivea Men Shower Gels',
     subtitle: 'Seven refreshing formulas for total body care',
@@ -75,6 +85,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Men’s Grooming',
   },
   {
+    slug: 'khamrah',
     to: '/collections/khamrah',
     name: 'Lattafa Khamrah Collection',
     subtitle: 'Khamrah, Qahwa and Dukhan signature fragrances',
@@ -82,6 +93,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Fragrances',
   },
   {
+    slug: 'signature-women',
     to: '/collections/signature-women',
     name: 'Signature Fragrances for Women',
     subtitle: 'A wide collection of feminine Lattafa signatures',
@@ -89,6 +101,7 @@ const COLLECTIONS: CollectionCard[] = [
     badge: 'Women’s Fragrances',
   },
   {
+    slug: 'signature-men',
     to: '/collections/signature-men',
     name: 'Signature Fragrances for Men',
     subtitle: 'Bold, fresh, spicy and oud signatures for men',
@@ -98,6 +111,38 @@ const COLLECTIONS: CollectionCard[] = [
 ];
 
 export const CollectionsGrid: React.FC = () => {
+  const [liveImages, setLiveImages] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch('/api/products')
+      .then((response) => (response.ok ? response.json() : []))
+      .then((products: Array<{ collectionSlug?: string; image?: string; isBestSeller?: boolean; sortOrder?: number }>) => {
+        if (!Array.isArray(products)) return;
+        const images: Record<string, string> = {};
+        const sorted = [...products].sort((a, b) => {
+          if (Boolean(a.isBestSeller) !== Boolean(b.isBestSeller)) return a.isBestSeller ? -1 : 1;
+          return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+        });
+        for (const product of sorted) {
+          if (
+            product.collectionSlug
+            && product.image
+            && !product.image.includes('placeholder')
+            && !images[product.collectionSlug]
+          ) {
+            images[product.collectionSlug] = product.image;
+          }
+        }
+        setLiveImages(images);
+      })
+      .catch(() => {});
+  }, []);
+
+  const collections = useMemo(() => COLLECTIONS.map((collection) => ({
+    ...collection,
+    image: liveImages[collection.slug] || collection.image,
+  })), [liveImages]);
+
   return (
     <section id="collections" className="py-16 sm:py-20 bg-[#FAF8FC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -112,17 +157,18 @@ export const CollectionsGrid: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8">
-          {COLLECTIONS.map((c) => (
+          {collections.map((c) => (
             <Link
               key={c.to}
               to={c.to}
               className="group relative rounded-2xl sm:rounded-3xl overflow-hidden bg-white border border-purple-100 shadow-sm hover:shadow-xl transition-all"
             >
-              <div className="aspect-[4/5] w-full overflow-hidden bg-gray-100">
+              <div className="aspect-[4/5] w-full overflow-hidden bg-gradient-to-b from-white to-purple-50 flex items-center justify-center p-3 sm:p-5">
                 <img
                   src={c.image}
                   alt={c.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                  referrerPolicy="no-referrer"
                 />
               </div>
 
