@@ -11,14 +11,19 @@
 set -e
 
 echo "🏗  Building and deploying to Vercel production..."
-DEPLOY_OUTPUT=$(npx vercel --prod --yes 2>&1)
-echo "$DEPLOY_OUTPUT"
-DEPLOY_URL=$(printf '%s\n' "$DEPLOY_OUTPUT" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -1)
+npx vercel --prod --yes
+
+# Newer Vercel CLI versions can return before the final URL line is printed.
+# Resolve the newest production deployment from structured JSON instead of
+# scraping human-readable terminal output, then wait until it is ready.
+DEPLOY_URL=$(npx vercel list 9pm-collections-jfh --environment production --limit 1 --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s).deployments?.[0];if(d?.url)process.stdout.write('https://'+d.url)})")
 
 if [ -z "$DEPLOY_URL" ]; then
   echo "❌ Could not determine deployment URL. Check Vercel output above."
   exit 1
 fi
+
+npx vercel inspect "$DEPLOY_URL" --wait --timeout 5m
 
 echo "✅ Deployed to: $DEPLOY_URL"
 echo ""
