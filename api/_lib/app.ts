@@ -10,6 +10,13 @@ import * as hawasCatalog from './catalogs/hawas.js';
 import * as ceraveCatalog from './catalogs/cerave.js';
 import * as badeeAlOudCatalog from './catalogs/badeeAlOud.js';
 import * as medixCatalog from './catalogs/medix.js';
+import { PERFUMES_DATA as headShouldersProducts } from '../../src/pages/head-shoulders/data/lotionsData.js';
+import { PERFUMES_DATA as niveaShowerGelProducts } from '../../src/pages/nivea-shower-gel/data/lotionsData.js';
+import { PERFUMES_DATA as khamrahProducts } from '../../src/pages/khamrah/data/perfumesData.js';
+import { PERFUMES_DATA as signatureMenProducts } from '../../src/pages/signature-men/data/perfumesData.js';
+import { PERFUMES_DATA as niveaFaceWashProducts } from '../../src/pages/nivea-face-wash/data/lotionsData.js';
+import { PERFUMES_DATA as doveSoapProducts } from '../../src/pages/dove-soap/data/lotionsData.js';
+import { PERFUMES_DATA as signatureWomenProducts } from '../../src/pages/signature-women/data/perfumesData.js';
 
 // In-app notification shown to signed-in customers on /account — either an
 // admin-composed broadcast campaign, or an automatic note tied to one order
@@ -458,12 +465,43 @@ interface Catalog {
   generateSmartFallbackResponse: (userText: string, currency: string) => string;
 }
 
+function makeSalesCatalog(
+  label: string,
+  products: Catalog['perfumesData'],
+  productType: string
+): Catalog {
+  const productList = products.map((p) => `${p.name} ($${p.priceUSD}, ID: ${p.id})`).join('\n');
+  return {
+    label,
+    perfumesData: products,
+    systemInstruction: `You are Amina, a warm, concise member of the Juba Fashion Hub sales team in Juba, South Sudan. Help customers choose from the ${label}. Keep replies to 2-3 short sentences, never use bold formatting, and ask what result or occasion they need. Products:\n${productList}\nWe deliver free across Juba within 120 minutes. Payment options are cash on delivery, bank transfer, or m-GURUSH. If recommending, append [RECOMMEND: product_id]. If the customer is ready to order, collect name, phone, delivery address, payment method and items, then append a valid [CREATE_ORDER: {...}] tag using the listed product IDs.`,
+    generateSmartFallbackResponse: (userText: string, currency: string) => {
+      const queryText = userText.toLowerCase();
+      const matched = products.find((p) => queryText.includes(p.name.toLowerCase())) || products[0];
+      if (queryText.includes('deliver') || queryText.includes('juba')) {
+        return 'We offer FREE express delivery across Juba within 120 minutes today. Which area are you in?';
+      }
+      if (queryText.includes('price') || queryText.includes('cost')) {
+        return `${label} prices start from ${currency === 'SSP' ? `${matched.priceSSP.toLocaleString()} SSP` : `$${matched.priceUSD}`}. Tell me what you need and I will help you choose the best option.`;
+      }
+      return `Jambo! I can help you choose the right ${productType} from ${label}. What result, style, or occasion are you shopping for?`;
+    },
+  };
+}
+
 const CATALOGS: Record<string, Catalog> = {
   'nine-collection': nineCollectionCatalog,
   hawas: hawasCatalog,
   cerave: ceraveCatalog,
   'badee-al-oud': badeeAlOudCatalog,
   medix: medixCatalog,
+  'head-shoulders': makeSalesCatalog('Head & Shoulders Anti-Dandruff Collection', headShouldersProducts, 'shampoo'),
+  'nivea-shower-gel': makeSalesCatalog('Nivea Men Shower Gel Collection', niveaShowerGelProducts, 'shower gel'),
+  khamrah: makeSalesCatalog('Lattafa Khamrah Collection', khamrahProducts, 'fragrance'),
+  'signature-men': makeSalesCatalog('Signature Fragrances for Men', signatureMenProducts, 'fragrance'),
+  'nivea-face-wash': makeSalesCatalog('Nivea Men Face Wash Collection', niveaFaceWashProducts, 'face wash'),
+  'dove-soap': makeSalesCatalog('Dove Beauty Bar Collection', doveSoapProducts, 'beauty bar'),
+  'signature-women': makeSalesCatalog('Signature Fragrances for Women', signatureWomenProducts, 'fragrance'),
 };
 
 function resolveCatalog(storeSlug?: string): Catalog {

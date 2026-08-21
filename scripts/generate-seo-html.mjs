@@ -154,6 +154,28 @@ const PAGES = [
       ],
     },
   },
+  ...[
+    ['head-shoulders', 'Head & Shoulders Anti-Dandruff Collection', 'Shop Head & Shoulders 190ml anti-dandruff shampoos in Juba. Silk & Smooth, Total Care, Extra Volume and Daily Clean at $15 each.', '/images/head_shoulders_placeholder.svg'],
+    ['nivea-shower-gel', 'Nivea Men Shower Gel Collection', 'Shop Nivea Men 250ml shower gels in Juba. Seven refreshing body-care formulas at $20 each with free express delivery.', '/images/nivea_shower_gel_placeholder.svg'],
+    ['khamrah', 'Lattafa Khamrah Collection', 'Shop authentic Lattafa Khamrah, Khamrah Qahwa and Khamrah Dukhan fragrances with free express delivery across Juba.', '/images/khamrah_placeholder.svg'],
+    ['signature-men', 'Signature Fragrances for Men', 'Explore authentic Lattafa signature fragrances for men in Juba, with bold, fresh, spicy and oud options plus fast delivery.', '/images/signature_men_placeholder.svg'],
+    ['nivea-face-wash', 'Nivea Men Face Wash Collection', 'Shop Nivea Men 100g face washes in Juba: Dark Spot Reduction, Deep Impact and All-In-1 Charcoal at $15 each.', '/images/nivea_face_wash_placeholder.svg'],
+    ['dove-beauty-bars', 'Dove Beauty Bar Collection', 'Shop Dove 135g Beauty Bars in Juba: Original, Pink, Serum and Cocoa Butter variants at $6 each.', '/images/dove_soap_placeholder.svg'],
+    ['signature-women', 'Signature Fragrances for Women', 'Explore authentic Lattafa signature fragrances for women in Juba, from fruity florals to gourmand and oud favorites.', '/images/signature_women_placeholder.svg'],
+  ].map(([slug, name, description, image]) => ({
+    route: `/collections/${slug}`,
+    outFile: `collections/${slug}/index.html`,
+    title: `${name} | Juba Fashion Hub`,
+    description,
+    image,
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name,
+      url: `${SITE_URL}/collections/${slug}`,
+      isPartOf: { '@type': 'WebSite', name: 'Juba Fashion Hub', url: SITE_URL },
+    },
+  })),
 ];
 
 function escapeHtml(str) {

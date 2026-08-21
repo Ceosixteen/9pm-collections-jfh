@@ -19,6 +19,13 @@ const COLLECTION_PATHS: Record<string, string> = {
   cerave: '/collections/cerave',
   'badee-al-oud': '/collections/badee-al-oud',
   medix: '/collections/medix',
+  'head-shoulders': '/collections/head-shoulders',
+  'nivea-shower-gel': '/collections/nivea-shower-gel',
+  khamrah: '/collections/khamrah',
+  'signature-men': '/collections/signature-men',
+  'nivea-face-wash': '/collections/nivea-face-wash',
+  'dove-soap': '/collections/dove-beauty-bars',
+  'signature-women': '/collections/signature-women',
 };
 
 const COLLECTION_LABELS: Record<string, string> = {
@@ -27,6 +34,13 @@ const COLLECTION_LABELS: Record<string, string> = {
   cerave: 'CeraVe Skincare',
   'badee-al-oud': "Bade'e Al Oud",
   medix: 'Medix 5.5 Body Care',
+  'head-shoulders': 'Head & Shoulders Hair Care',
+  'nivea-shower-gel': 'Nivea Men Shower Gels',
+  khamrah: 'Lattafa Khamrah',
+  'signature-men': 'Signature Fragrances for Men',
+  'nivea-face-wash': 'Nivea Men Face Wash',
+  'dove-soap': 'Dove Beauty Bars',
+  'signature-women': 'Signature Fragrances for Women',
 };
 
 interface SearchModalProps {

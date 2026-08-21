@@ -9,6 +9,13 @@ const COLLECTION_PATHS: Record<string, string> = {
   cerave: '/collections/cerave',
   'badee-al-oud': '/collections/badee-al-oud',
   medix: '/collections/medix',
+  'head-shoulders': '/collections/head-shoulders',
+  'nivea-shower-gel': '/collections/nivea-shower-gel',
+  khamrah: '/collections/khamrah',
+  'signature-men': '/collections/signature-men',
+  'nivea-face-wash': '/collections/nivea-face-wash',
+  'dove-soap': '/collections/dove-beauty-bars',
+  'signature-women': '/collections/signature-women',
 };
 
 const COLLECTION_BADGE_COLORS: Record<string, string> = {
@@ -17,6 +24,13 @@ const COLLECTION_BADGE_COLORS: Record<string, string> = {
   cerave: 'bg-teal-700 text-white',
   'badee-al-oud': 'bg-amber-900 text-white',
   medix: 'bg-purple-800 text-white',
+  'head-shoulders': 'bg-blue-700 text-white',
+  'nivea-shower-gel': 'bg-blue-900 text-white',
+  khamrah: 'bg-amber-800 text-white',
+  'signature-men': 'bg-slate-900 text-white',
+  'nivea-face-wash': 'bg-blue-800 text-white',
+  'dove-soap': 'bg-sky-700 text-white',
+  'signature-women': 'bg-rose-700 text-white',
 };
 
 interface HomeProductModalProps {

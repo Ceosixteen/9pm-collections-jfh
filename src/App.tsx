@@ -5,6 +5,13 @@ import HawasApp from './pages/hawas/App';
 import CeraveApp from './pages/cerave/App';
 import BadeeAlOudApp from './pages/badee-al-oud/App';
 import MedixApp from './pages/medix/App';
+import HeadShouldersApp from './pages/head-shoulders/App';
+import NiveaShowerGelApp from './pages/nivea-shower-gel/App';
+import KhamrahApp from './pages/khamrah/App';
+import SignatureMenApp from './pages/signature-men/App';
+import NiveaFaceWashApp from './pages/nivea-face-wash/App';
+import DoveSoapApp from './pages/dove-soap/App';
+import SignatureWomenApp from './pages/signature-women/App';
 import AdminApp from './pages/admin/App';
 import AccountApp from './pages/account/App';
 
@@ -37,6 +44,13 @@ export default function App() {
       <Route path="/collections/cerave" element={<CeraveApp />} />
       <Route path="/collections/badee-al-oud" element={<BadeeAlOudApp />} />
       <Route path="/collections/medix" element={<MedixApp />} />
+      <Route path="/collections/head-shoulders" element={<HeadShouldersApp />} />
+      <Route path="/collections/nivea-shower-gel" element={<NiveaShowerGelApp />} />
+      <Route path="/collections/khamrah" element={<KhamrahApp />} />
+      <Route path="/collections/signature-men" element={<SignatureMenApp />} />
+      <Route path="/collections/nivea-face-wash" element={<NiveaFaceWashApp />} />
+      <Route path="/collections/dove-beauty-bars" element={<DoveSoapApp />} />
+      <Route path="/collections/signature-women" element={<SignatureWomenApp />} />
       <Route path="/account" element={<AccountApp />} />
     </Routes>
   );

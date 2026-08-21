@@ -10,6 +10,13 @@ const COLLECTION_COLORS: Record<string, string> = {
   cerave: 'bg-teal-700 text-white',
   'badee-al-oud': 'bg-amber-900 text-white',
   medix: 'bg-purple-800 text-white',
+  'head-shoulders': 'bg-blue-700 text-white',
+  'nivea-shower-gel': 'bg-blue-900 text-white',
+  khamrah: 'bg-amber-800 text-white',
+  'signature-men': 'bg-slate-900 text-white',
+  'nivea-face-wash': 'bg-blue-800 text-white',
+  'dove-soap': 'bg-sky-700 text-white',
+  'signature-women': 'bg-rose-700 text-white',
 };
 
 function ProductCard({

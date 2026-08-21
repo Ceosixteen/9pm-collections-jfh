@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F6EEFD"/>
+      <stop offset="100%" stop-color="#EAD9FB"/>
+    </linearGradient>
+    <linearGradient id="bottle" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#B24BF3"/>
+      <stop offset="100%" stop-color="#9f35e3"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="500" fill="url(#bg)"/>
+  <rect x="150" y="120" width="100" height="40" rx="10" fill="url(#bottle)"/>
+  <rect x="130" y="160" width="140" height="230" rx="24" fill="url(#bottle)"/>
+  <rect x="150" y="220" width="100" height="90" rx="8" fill="#ffffff" opacity="0.92"/>
+  <text x="200" y="258" font-family="Arial, sans-serif" font-size="15" font-weight="800" fill="#B24BF3" text-anchor="middle">MEDIX</text>
+  <text x="200" y="278" font-family="Arial, sans-serif" font-size="15" font-weight="800" fill="#B24BF3" text-anchor="middle">5.5</text>
+  <text x="200" y="440" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#6B21A8" text-anchor="middle">Product photo coming soon</text>
+</svg>

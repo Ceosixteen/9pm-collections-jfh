@@ -11,6 +11,13 @@ export const Header: React.FC = () => {
     { to: '/collections/cerave', label: 'CeraVe Skincare' },
     { to: '/collections/badee-al-oud', label: "Bade'e Al Oud" },
     { to: '/collections/medix', label: 'Medix 5.5 Body Care' },
+    { to: '/collections/nivea-face-wash', label: 'Nivea Face Wash' },
+    { to: '/collections/dove-beauty-bars', label: 'Dove Beauty Bars' },
+    { to: '/collections/head-shoulders', label: 'Head & Shoulders' },
+    { to: '/collections/nivea-shower-gel', label: 'Nivea Shower Gels' },
+    { to: '/collections/khamrah', label: 'Lattafa Khamrah' },
+    { to: '/collections/signature-women', label: 'Women’s Signatures' },
+    { to: '/collections/signature-men', label: 'Men’s Signatures' },
   ];
 
   return (

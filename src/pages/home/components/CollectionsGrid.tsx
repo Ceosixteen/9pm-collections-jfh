@@ -46,6 +46,55 @@ const COLLECTIONS: CollectionCard[] = [
     image: '/images/medix_placeholder.svg',
     badge: 'Body Care',
   },
+  {
+    to: '/collections/nivea-face-wash',
+    name: 'Nivea Men Face Wash',
+    subtitle: 'Dark Spot Reduction, Deep Impact & All-In-1 Charcoal',
+    image: '/images/nivea_face_wash_placeholder.svg',
+    badge: 'Face Care',
+  },
+  {
+    to: '/collections/dove-beauty-bars',
+    name: 'Dove Beauty Bar Collection',
+    subtitle: 'Original, Pink, Serum & Cocoa Butter Beauty Bars',
+    image: '/images/dove_soap_placeholder.svg',
+    badge: 'Bath & Body',
+  },
+  {
+    to: '/collections/head-shoulders',
+    name: 'Head & Shoulders Collection',
+    subtitle: 'Anti-dandruff care for smooth, clean and fuller-looking hair',
+    image: '/images/head_shoulders_placeholder.svg',
+    badge: 'Hair Care',
+  },
+  {
+    to: '/collections/nivea-shower-gel',
+    name: 'Nivea Men Shower Gels',
+    subtitle: 'Seven refreshing formulas for total body care',
+    image: '/images/nivea_shower_gel_placeholder.svg',
+    badge: 'Men’s Grooming',
+  },
+  {
+    to: '/collections/khamrah',
+    name: 'Lattafa Khamrah Collection',
+    subtitle: 'Khamrah, Qahwa and Dukhan signature fragrances',
+    image: '/images/khamrah_placeholder.svg',
+    badge: 'Fragrances',
+  },
+  {
+    to: '/collections/signature-women',
+    name: 'Signature Fragrances for Women',
+    subtitle: 'A wide collection of feminine Lattafa signatures',
+    image: '/images/signature_women_placeholder.svg',
+    badge: 'Women’s Fragrances',
+  },
+  {
+    to: '/collections/signature-men',
+    name: 'Signature Fragrances for Men',
+    subtitle: 'Bold, fresh, spicy and oud signatures for men',
+    image: '/images/signature_men_placeholder.svg',
+    badge: 'Men’s Fragrances',
+  },
 ];
 
 export const CollectionsGrid: React.FC = () => {
