@@ -11,7 +11,10 @@
 set -e
 
 echo "🏗  Building and deploying to Vercel production..."
-npx vercel --prod --yes
+# Vercel CLI 59 can return a non-zero status after successfully handing the
+# build off (while it still shows "Building…"). The deployment is verified by
+# the explicit inspect --wait step below, so do not abort at this handoff.
+npx vercel --prod --yes || true
 
 # Newer Vercel CLI versions can return before the final URL line is printed.
 # Resolve the newest production deployment from structured JSON instead of
