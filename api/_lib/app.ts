@@ -479,7 +479,7 @@ interface Catalog {
   label: string;
   perfumesData: readonly CatalogProduct[];
   systemInstruction: string;
-  generateSmartFallbackResponse: (userText: string, currency: string) => string;
+  generateSmartFallbackResponse: (userText: string, currency: string, chatContext?: string) => string;
 }
 
 function makeSalesCatalog(
@@ -523,8 +523,9 @@ STORE RULES:
 - Payment options are cash on delivery, bank transfer, or m-GURUSH.
 - When giving a final product recommendation, append exactly one [RECOMMEND: product_id] tag for the strongest match.
 - If the customer is ready to order, collect name, phone, delivery address, payment method and items, then append a valid [CREATE_ORDER: {...}] tag using only the listed product IDs.`,
-    generateSmartFallbackResponse: (userText: string, currency: string) => {
+    generateSmartFallbackResponse: (userText: string, currency: string, chatContext = '') => {
       const queryText = userText.toLowerCase();
+      const conversationText = `${chatContext} ${userText}`.toLowerCase();
       const matched = products.find((p) => queryText.includes(p.name.toLowerCase())) || products[0];
       if (queryText.includes('deliver') || queryText.includes('juba')) {
         return 'We offer FREE express delivery across Juba within 120 minutes today. Which area are you in?';
@@ -532,12 +533,44 @@ STORE RULES:
       if (queryText.includes('price') || queryText.includes('cost')) {
         return `${label} prices start from ${currency === 'SSP' ? `${matched.priceSSP.toLocaleString()} SSP` : `$${matched.priceUSD}`}. Tell me what you need and I will help you choose the best option.`;
       }
-      const isRecommendation = /recommend|which|best|suggest|choose|gift|not sure|unsure|what should/i.test(queryText);
+      const isRecommendation = /recommend|which|best|suggest|choose|gift|not sure|unsure|what should/i.test(conversationText);
       if (isRecommendation) {
         const isFragrance = /fragrance|perfume|scent/i.test(productType);
-        return isFragrance
-          ? `I can help you find the right match. Is it for you or a gift, and do you want something fresh for daytime or bold for evenings? What budget should I stay within?`
-          : `I can help you choose the right ${productType}. What is your main concern or result you want, and do you have sensitive skin or a budget limit?`;
+        const preferenceSignals = isFragrance
+          ? /fresh|sweet|bold|soft|floral|fruity|oud|woody|spicy|day|night|evening|office|date|long lasting|projection|under|budget|\$\d+/i.test(conversationText)
+          : /dry|oily|sensitive|acne|spots|bright|glow|hydrate|moist|dandruff|flakes|volume|smooth|under|budget|\$\d+/i.test(conversationText);
+
+        if (!preferenceSignals) {
+          return isFragrance
+            ? `I can help you find the right match. Is it for you or a gift, and do you want something fresh for daytime or bold for evenings? What budget should I stay within?`
+            : `I can help you choose the right ${productType}. What is your main concern or result you want, and do you have sensitive skin or a budget limit?`;
+        }
+
+        const budgetMatch = conversationText.match(/(?:under|budget|max(?:imum)?|\$)\s*\$?\s*(\d{1,4})/i);
+        const maxBudget = budgetMatch ? Number(budgetMatch[1]) : Number.POSITIVE_INFINITY;
+        const stopWords = new Set(['this', 'that', 'with', 'from', 'have', 'want', 'need', 'looking', 'under', 'budget', 'recommend', 'best', 'which', 'what', 'should', 'something', 'product', 'perfume', 'fragrance']);
+        const wantedTokens = conversationText
+          .replace(/[^a-z0-9 ]/g, ' ')
+          .split(/\s+/)
+          .filter((token) => token.length >= 4 && !stopWords.has(token));
+        const ranked = products
+          .filter((product) => product.priceUSD <= maxBudget && (product.stockCount ?? 1) > 0)
+          .map((product) => {
+            const searchable = [
+              product.name, product.tagline, product.description, product.fragranceFamily,
+              product.bestTimeToWear, product.projection, product.longevity,
+              ...(product.notesTop || []), ...(product.notesMiddle || []), ...(product.notesBase || []),
+            ].filter(Boolean).join(' ').toLowerCase();
+            const score = wantedTokens.reduce((total, token) => total + (searchable.includes(token) ? 1 : 0), 0);
+            return { product, score };
+          })
+          .sort((a, b) => b.score - a.score || a.product.priceUSD - b.product.priceUSD);
+        const first = ranked[0]?.product || products[0];
+        const second = ranked[1]?.score > 0 ? ranked[1].product : undefined;
+        const price = (product: CatalogProduct) => currency === 'SSP' ? `${product.priceSSP.toLocaleString()} SSP` : `$${product.priceUSD}`;
+        const reason = first.tagline || first.description || `a strong match from ${label}`;
+        const alternative = second ? ` Another good option is ${second.name} at ${price(second)}.` : '';
+        return `${first.name} is my strongest match at ${price(first)} — ${reason}.${alternative} Would you like me to add ${first.name} to your cart? [RECOMMEND: ${first.id}]`;
       }
       return `Jambo! I can help you choose the right ${productType} from ${label}. What result, style, or occasion are you shopping for?`;
     },
@@ -1092,12 +1125,15 @@ export function createApp(): express.Express {
       // System Prompt for Amina - Sales Team Concierge (per-collection persona)
       const systemInstruction = catalog.systemInstruction;
 
+      const recentChatContext = Array.isArray(chatHistory)
+        ? chatHistory.slice(-6).map((m: any) => `${m.sender}: ${m.text}`).join('\n')
+        : '';
       const promptText = `
 User Question: "${message}"
 Selected Currency Context: ${selectedCurrency}
 
 Previous Chat Context:
-${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender}: ${m.text}`).join('\n') : ''}
+${recentChatContext}
       `;
 
       let responseText = '';
@@ -1106,11 +1142,11 @@ ${Array.isArray(chatHistory) ? chatHistory.slice(-4).map((m: any) => `${m.sender
         responseText = await callGroqWithFallback(systemInstruction, promptText, 0.7);
       } catch (e) {
         console.warn('Both Groq models failed, using smart fallback engine:', e);
-        responseText = catalog.generateSmartFallbackResponse(message, selectedCurrency);
+        responseText = catalog.generateSmartFallbackResponse(message, selectedCurrency, recentChatContext);
       }
 
       if (!responseText) {
-        responseText = catalog.generateSmartFallbackResponse(message, selectedCurrency);
+        responseText = catalog.generateSmartFallbackResponse(message, selectedCurrency, recentChatContext);
       }
 
       let recommendedProductId: string | undefined = undefined;
