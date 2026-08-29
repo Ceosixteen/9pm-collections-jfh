@@ -162,6 +162,9 @@ const PAGES = [
     ['nivea-face-wash', 'Nivea Men Face Wash Collection', 'Shop Nivea Men 100g face washes in Juba: Dark Spot Reduction, Deep Impact and All-In-1 Charcoal at $15 each.', '/images/nivea_face_wash_placeholder.svg'],
     ['dove-beauty-bars', 'Dove Beauty Bar Collection', 'Shop Dove 135g Beauty Bars in Juba: Original, Pink, Serum and Cocoa Butter variants at $6 each.', '/images/dove_soap_placeholder.svg'],
     ['signature-women', 'Signature Fragrances for Women', 'Explore authentic Lattafa signature fragrances for women in Juba, from fruity florals to gourmand and oud favorites.', '/images/signature_women_placeholder.svg'],
+    ['nivea-spray', 'Nivea Deodorant Spray Collection', 'Shop Nivea Deodorant Spray in Juba — Dry Comfort, Black & White Invisible, Protect & Care, Fresh Natural, Men Sensitive and Women Fresh Power. 6 variants at $7 each, or bundle all 6 for just $35.', '/images/nivea_spray_dry_comfort.png'],
+    ['nivea-lotion', 'Nivea Body Lotion Collection', 'Shop Nivea Body Lotion in Juba — Aloe Hydration, Express Hydration, Soft Milk and Cocoa Butter. 4 deeply moisturising variants at $13 each, with free express delivery.', '/images/nivea_lotion_aloe_hydration.png'],
+    ['pantene', 'Pantene Pro-V Shampoo Collection', 'Shop Pantene Pro-V Shampoo in Juba — Anti-Dandruff, Classic Clean, Moisture Renewal, Smooth & Sleek, Volume & Fullness, and Repair & Protect. 6 variants at $8 each with free express delivery.', '/images/pantene_anti_dandruff.jpg'],
   ].map(([slug, name, description, image]) => ({
     route: `/collections/${slug}`,
     outFile: `collections/${slug}/index.html`,
