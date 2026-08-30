@@ -19,7 +19,7 @@ npx vercel --prod --yes || true
 # Newer Vercel CLI versions can return before the final URL line is printed.
 # Resolve the newest production deployment from structured JSON instead of
 # scraping human-readable terminal output, then wait until it is ready.
-DEPLOY_URL=$(npx vercel list 9pm-collections-jfh --environment production --limit 1 --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s).deployments?.[0];if(d?.url)process.stdout.write('https://'+d.url)})")
+DEPLOY_URL=$(npx vercel list juba-fashion-hub --environment production --limit 1 --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s).deployments?.[0];if(d?.url)process.stdout.write('https://'+d.url)})")
 
 if [ -z "$DEPLOY_URL" ]; then
   echo "❌ Could not determine deployment URL. Check Vercel output above."
