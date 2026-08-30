@@ -17,6 +17,9 @@ const COLLECTION_COLORS: Record<string, string> = {
   'nivea-face-wash': 'bg-blue-800 text-white',
   'dove-soap': 'bg-sky-700 text-white',
   'signature-women': 'bg-rose-700 text-white',
+  'nivea-spray': 'bg-[#003087] text-white',
+  'nivea-lotion': 'bg-[#003087] text-white',
+  pantene: 'bg-[#1a1a2e] text-white',
 };
 
 const COLLECTION_LABELS: Record<string, string> = {
@@ -32,13 +35,17 @@ const COLLECTION_LABELS: Record<string, string> = {
   'nivea-face-wash': 'Nivea Men Face Wash',
   'dove-soap': 'Dove Beauty Bars',
   'signature-women': "Women's Signature Fragrances",
+  'nivea-spray': 'Nivea Deodorant',
+  'nivea-lotion': 'Nivea Body Lotion',
+  pantene: 'Pantene Pro-V',
 };
 
 const FRAGRANCE_COLLECTIONS = new Set([
   'nine-collection', 'hawas', 'badee-al-oud', 'khamrah', 'signature-men', 'signature-women',
 ]);
-const SKIN_BODY_COLLECTIONS = new Set(['cerave', 'medix', 'dove-soap']);
+const SKIN_BODY_COLLECTIONS = new Set(['cerave', 'medix', 'dove-soap', 'nivea-lotion', 'nivea-spray']);
 const GROOMING_COLLECTIONS = new Set(['nivea-face-wash', 'nivea-shower-gel']);
+const HAIR_COLLECTIONS = new Set(['head-shoulders', 'pantene']);
 
 interface ApiProduct {
   id: string;
@@ -58,16 +65,13 @@ interface ApiProduct {
 
 function toHomeProduct(product: ApiProduct): HomeProduct {
   const isFragrance = FRAGRANCE_COLLECTIONS.has(product.collectionSlug);
-  const isHairCare = product.collectionSlug === 'head-shoulders';
   const category: HomeProduct['category'] = isFragrance
     ? 'fragrance'
-    : isHairCare
+    : HAIR_COLLECTIONS.has(product.collectionSlug)
       ? 'haircare'
       : GROOMING_COLLECTIONS.has(product.collectionSlug)
         ? 'grooming'
-        : product.collectionSlug === 'medix' || product.collectionSlug === 'dove-soap'
-          ? 'bodycare'
-          : 'skincare';
+        : 'bodycare';
   const notes = [...(product.notesTop || []), ...(product.notesMiddle || []), ...(product.notesBase || [])];
 
   return {
@@ -224,8 +228,8 @@ export const ProductShowcase: React.FC = () => {
     {
       title: 'Hair & Scalp Care',
       emoji: '🫧',
-      subtitle: 'Anti-dandruff shampoos for cleaner roots, smoother hair and flake-free confidence',
-      products: catalogue.filter((product) => product.collectionSlug === 'head-shoulders'),
+      subtitle: 'Anti-dandruff shampoos and Pro-V formulas for cleaner, stronger, healthier hair',
+      products: catalogue.filter((product) => HAIR_COLLECTIONS.has(product.collectionSlug)),
     },
   ].filter((row) => row.products.length > 0), [catalogue]);
 

@@ -33,6 +33,9 @@ export const Footer: React.FC = () => {
               <Link to="/collections/khamrah" className="hover:text-white transition-colors">Lattafa Khamrah Collection</Link>
               <Link to="/collections/signature-women" className="hover:text-white transition-colors">Signature Fragrances for Women</Link>
               <Link to="/collections/signature-men" className="hover:text-white transition-colors">Signature Fragrances for Men</Link>
+              <Link to="/collections/nivea-spray" className="hover:text-white transition-colors">Nivea Deodorant Spray Collection</Link>
+              <Link to="/collections/nivea-lotion" className="hover:text-white transition-colors">Nivea Body Lotion Collection</Link>
+              <Link to="/collections/pantene" className="hover:text-white transition-colors">Pantene Pro-V Shampoo Collection</Link>
             </div>
           </div>
 
