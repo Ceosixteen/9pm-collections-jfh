@@ -279,8 +279,9 @@ export const INITIAL_KNOWLEDGE_BASE: KnowledgeBase = {
 };
 
 export const DEFAULT_TELEGRAM_CONFIG: TelegramConfig = {
-  botToken: '7829102934:AAGx7q_Zk92812kX9a3182-JUBA_BOT',
-  chatId: '-100234918239',
+  // Credentials must only come from server-side environment variables.
+  botToken: '',
+  chatId: '',
   enabled: true,
   autoNotifyOnOrder: true,
 };

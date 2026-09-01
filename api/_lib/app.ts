@@ -687,6 +687,34 @@ function requireAdminAuth(req: express.Request, res: express.Response, next: exp
   next();
 }
 
+type RateLimitEntry = { count: number; resetAt: number };
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+function rateLimit(name: string, maxRequests: number, windowMs: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0])?.trim() || req.ip || 'unknown';
+    const key = `${name}:${ip}`;
+    const now = Date.now();
+    const existing = rateLimitStore.get(key);
+    const entry = !existing || existing.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : existing;
+
+    entry.count += 1;
+    rateLimitStore.set(key, entry);
+    res.setHeader('RateLimit-Limit', String(maxRequests));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, maxRequests - entry.count)));
+
+    if (entry.count > maxRequests) {
+      const retryAfter = Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
+      res.setHeader('Retry-After', String(retryAfter));
+      return res.status(429).json({ error: 'Too many requests. Please wait and try again.' });
+    }
+    next();
+  };
+}
+
 // In-memory state
 let currentKnowledgeBase: KnowledgeBase = { ...INITIAL_KNOWLEDGE_BASE };
 let currentTelegramConfig: TelegramConfig = {
@@ -1048,6 +1076,7 @@ INSTRUCTIONS FOR ALEX:
 
 export function createApp(): express.Express {
   const app = express();
+  app.disable('x-powered-by');
   // Default 100kb limit is fine for everything except base64-encoded product
   // photo uploads (POST /api/admin/upload-image) — a base64 string runs ~33%
   // larger than the original file, so a modest few-MB phone photo can exceed
@@ -1056,7 +1085,7 @@ export function createApp(): express.Express {
   app.use(express.json({ limit: '12mb' }));
 
   // --- Admin auth endpoints ---
-  app.post('/api/admin/login', (req, res) => {
+  app.post('/api/admin/login', rateLimit('admin-login', 8, 15 * 60 * 1000), (req, res) => {
     const { username, password } = req.body || {};
     if (!ADMIN_PASSWORD) {
       return res.status(500).json({ error: 'Admin login is not configured yet (missing ADMIN_PASSWORD).' });
@@ -1112,7 +1141,7 @@ export function createApp(): express.Express {
   }
 
   // 1. Sales Team Chat API Endpoint
-  app.post('/api/chat', async (req, res) => {
+  app.post('/api/chat', rateLimit('customer-chat', 30, 5 * 60 * 1000), async (req, res) => {
     try {
       const { message, chatHistory, selectedCurrency = 'SSP', storeSlug } = req.body;
 
@@ -1312,13 +1341,12 @@ ${recentChatContext}
       console.error('Chat Error:', error);
       return res.status(500).json({
         error: 'Failed to process chat response',
-        details: error?.message || String(error),
       });
     }
   });
 
   // 2. Order Submission & Telegram Bot Integration Endpoint
-  app.post('/api/order', async (req, res) => {
+  app.post('/api/order', rateLimit('create-order', 20, 10 * 60 * 1000), async (req, res) => {
     try {
       const {
         items,
@@ -1429,7 +1457,7 @@ ${recentChatContext}
       });
     } catch (error: any) {
       console.error('Order Submission Error:', error);
-      return res.status(500).json({ error: 'Failed to process order. Please try again or contact us on WhatsApp.', details: error.message });
+      return res.status(500).json({ error: 'Failed to process order. Please try again or contact us on WhatsApp.' });
     }
   });
 
@@ -1708,7 +1736,7 @@ ${recentChatContext}
   // itself) and send it ourselves — the link is otherwise identical to one
   // Firebase would have emailed, so the client-side
   // isSignInWithEmailLink/signInWithEmailLink flow is unaffected.
-  app.post('/api/auth/send-login-link', async (req, res) => {
+  app.post('/api/auth/send-login-link', rateLimit('login-link', 5, 60 * 60 * 1000), async (req, res) => {
     try {
       const { email, redirectPath } = req.body || {};
       const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
@@ -1716,7 +1744,8 @@ ${recentChatContext}
         return res.status(400).json({ error: 'A valid email is required' });
       }
       const safePath = typeof redirectPath === 'string' && redirectPath.startsWith('/') ? redirectPath : '/account';
-      const continueUrl = `${req.protocol}://${req.get('host')}${safePath}`;
+      const publicSiteUrl = (process.env.PUBLIC_SITE_URL || 'https://jubafashionhub.link').replace(/\/$/, '');
+      const continueUrl = `${publicSiteUrl}${safePath}`;
 
       const link = await generateEmailSignInLink(trimmedEmail, continueUrl);
 
@@ -1760,7 +1789,7 @@ ${recentChatContext}
 
   // POST Email capture (homepage newsletter signup). Public — no auth needed
   // to submit an email, matching how /api/track-pageview works.
-  app.post('/api/leads', async (req, res) => {
+  app.post('/api/leads', rateLimit('email-lead', 10, 60 * 60 * 1000), async (req, res) => {
     try {
       const { email, source, storeSlug } = req.body || {};
       const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
@@ -1843,7 +1872,7 @@ ${recentChatContext}
   });
 
   // Setup Webhook helper
-  app.post('/api/telegram/setup-webhook', async (req, res) => {
+  app.post('/api/telegram/setup-webhook', requireAdminAuth, async (req, res) => {
     try {
       const { botToken } = req.body;
       const tokenToUse = botToken || process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
@@ -1871,7 +1900,7 @@ ${recentChatContext}
   });
 
   // 3. Telegram Test Ping Endpoint
-  app.post('/api/telegram/test', async (req, res) => {
+  app.post('/api/telegram/test', requireAdminAuth, async (req, res) => {
     try {
       const { botToken, chatId } = req.body;
       const tokenToUse = botToken || process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
@@ -1913,7 +1942,7 @@ ${recentChatContext}
   });
 
   // Helper endpoint to auto-detect numeric Chat ID from recent bot updates
-  app.post('/api/telegram/detect-chat-id', async (req, res) => {
+  app.post('/api/telegram/detect-chat-id', requireAdminAuth, async (req, res) => {
     try {
       const { botToken } = req.body;
       const tokenToUse = botToken || process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
