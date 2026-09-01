@@ -1110,6 +1110,16 @@ export function createApp(): express.Express {
   });
 
   // Helper to format Telegram Order Message for Juba Fashion Hub
+  const escapeTelegramHtml = (value: unknown) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const cleanCustomerText = (value: unknown, maxLength: number) => String(value ?? '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .trim()
+    .slice(0, maxLength);
+
   function formatTelegramOrderMessage(order: Order): string {
     const totalFormatted = order.currency === 'SSP'
       ? `SSP ${order.totalSSP.toLocaleString()}`
@@ -1118,7 +1128,7 @@ export function createApp(): express.Express {
     const itemsText = order.items
       .map(
         (item) =>
-          `• <b>${item.quantity}x ${item.productName}</b>\n  Price: ${order.currency === 'SSP' ? `SSP ${(item.unitPriceUSD * 8000).toLocaleString()}` : `$${item.unitPriceUSD}`}`
+          `• <b>${item.quantity}x ${escapeTelegramHtml(item.productName)}</b>\n  Price: ${order.currency === 'SSP' ? `SSP ${(item.unitPriceUSD * 8000).toLocaleString()}` : `$${item.unitPriceUSD}`}`
       )
       .join('\n');
 
@@ -1127,11 +1137,11 @@ export function createApp(): express.Express {
       : '';
 
     return `🌸 <b>JUBA FASHION HUB - NEW PERFUME ORDER (#${order.id})</b>\n\n` +
-      `👤 <b>Customer Name:</b> ${order.customerName}\n` +
-      `📞 <b>Phone Number:</b> ${order.customerPhone}\n` +
-      `📍 <b>City:</b> ${order.deliveryCity}\n` +
-      `🏠 <b>Delivery Address in Juba:</b> ${order.deliveryAddress}\n` +
-      `💳 <b>Payment Method:</b> ${order.paymentMethod.toUpperCase()}\n` +
+      `👤 <b>Customer Name:</b> ${escapeTelegramHtml(order.customerName)}\n` +
+      `📞 <b>Phone Number:</b> ${escapeTelegramHtml(order.customerPhone)}\n` +
+      `📍 <b>City:</b> ${escapeTelegramHtml(order.deliveryCity)}\n` +
+      `🏠 <b>Delivery Address in Juba:</b> ${escapeTelegramHtml(order.deliveryAddress)}\n` +
+      `💳 <b>Payment Method:</b> ${escapeTelegramHtml(order.paymentMethod.toUpperCase())}\n` +
       `💵 <b>Payment Currency:</b> ${order.currency}\n\n` +
       `🛍️ <b>BOTTLES ORDERED:</b>\n${itemsText}${discountInfo}\n\n` +
       `💰 <b>FINAL AMOUNT DUE:</b> <b>${totalFormatted}</b>\n\n` +
@@ -1350,12 +1360,6 @@ ${recentChatContext}
     try {
       const {
         items,
-        subtotalUSD,
-        subtotalSSP,
-        bundleDiscountUSD,
-        bundleDiscountSSP,
-        totalUSD,
-        totalSSP,
         currency,
         customerName,
         customerPhone,
@@ -1372,28 +1376,70 @@ ${recentChatContext}
         return res.status(400).json({ error: 'Missing required order fields' });
       }
 
+      if (!Array.isArray(items) || items.length > 25) {
+        return res.status(400).json({ error: 'Invalid order items' });
+      }
+
+      let catalogue: StoredProduct[];
+      try {
+        catalogue = await readFirestoreCollection<StoredProduct>('products');
+      } catch {
+        const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
+        catalogue = snapshot.docs.map((document) => document.data() as StoredProduct);
+      }
+      const productsById = new Map(catalogue.map((product) => [product.id, product]));
+      const verifiedItems = items.map((rawItem: any) => {
+        const productId = typeof rawItem?.productId === 'string' ? rawItem.productId : '';
+        const product = productsById.get(productId);
+        const quantity = Number(rawItem?.quantity);
+        if (!product || product.isActive === false || !Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
+          throw new Error('INVALID_ORDER_ITEM');
+        }
+        return {
+          productId: product.id,
+          productName: product.name,
+          quantity,
+          unitPriceUSD: Number(product.priceUSD),
+          unitPriceSSP: Number(product.priceUSD) * 8000,
+        };
+      });
+
+      const verifiedCurrency = currency === 'USD' ? 'USD' : 'SSP';
+      const verifiedPaymentMethod = ['cod', 'bank_transfer', 'm-gurush'].includes(paymentMethod)
+        ? paymentMethod
+        : 'cod';
+      const totalItemCount = verifiedItems.reduce((sum, item) => sum + item.quantity, 0);
+      const subtotalUSD = verifiedItems.reduce((sum, item) => sum + item.unitPriceUSD * item.quantity, 0);
+      const subtotalSSP = subtotalUSD * 8000;
+      const bundleDiscountUSD = totalItemCount >= 2 ? totalItemCount * 5 : 0;
+      const bundleDiscountSSP = bundleDiscountUSD * 8000;
+      const totalUSD = Math.max(0, subtotalUSD - bundleDiscountUSD);
+      const baseTotalSSP = Math.max(0, subtotalSSP - bundleDiscountSSP);
+      const hasSspDigitalFee = verifiedCurrency === 'SSP' && ['bank_transfer', 'm-gurush'].includes(verifiedPaymentMethod);
+      const totalSSP = hasSspDigitalFee ? Math.round(baseTotalSSP * 1.5) : baseTotalSSP;
+
       const orderId = `JFH-${Math.floor(100000 + Math.random() * 900000)}`;
       const newOrder: Order = {
         id: orderId,
         storeSlug: storeSlug || 'nine-collection',
-        items,
+        items: verifiedItems,
         subtotalUSD,
         subtotalSSP,
         bundleDiscountUSD: bundleDiscountUSD || 0,
         bundleDiscountSSP: bundleDiscountSSP || 0,
         totalUSD,
         totalSSP,
-        currency: currency || 'SSP',
-        customerName,
-        customerPhone,
-        customerEmail: customerEmail || '',
-        deliveryCity: deliveryCity || 'Juba',
-        deliveryAddress,
-        notes: notes || '',
-        paymentMethod,
+        currency: verifiedCurrency,
+        customerName: cleanCustomerText(customerName, 100),
+        customerPhone: cleanCustomerText(customerPhone, 40),
+        customerEmail: cleanCustomerText(customerEmail, 254).toLowerCase(),
+        deliveryCity: cleanCustomerText(deliveryCity || 'Juba', 80),
+        deliveryAddress: cleanCustomerText(deliveryAddress, 300),
+        notes: cleanCustomerText(notes, 500),
+        paymentMethod: verifiedPaymentMethod,
         paymentStatus: 'pending',
         deliveryStatus: 'pending',
-        bundleName: bundleName || undefined,
+        bundleName: cleanCustomerText(bundleName, 120) || undefined,
         createdAt: new Date().toISOString(),
         telegramNotified: false,
       };
@@ -1457,6 +1503,9 @@ ${recentChatContext}
       });
     } catch (error: any) {
       console.error('Order Submission Error:', error);
+      if (error?.message === 'INVALID_ORDER_ITEM') {
+        return res.status(400).json({ error: 'One or more order items are invalid or unavailable.' });
+      }
       return res.status(500).json({ error: 'Failed to process order. Please try again or contact us on WhatsApp.' });
     }
   });
