@@ -21,4 +21,5 @@ const app = initializeApp({
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
 export const firebaseWebApiKey: string = firebaseConfig.apiKey;
 export const firebaseStorageBucket: string = firebaseConfig.storageBucket;
+export const firebaseFirestoreDatabaseId: string = firebaseConfig.firestoreDatabaseId || '(default)';
 export { collection, doc, setDoc, getDocs, getDoc, deleteDoc, query, orderBy, limit, where };

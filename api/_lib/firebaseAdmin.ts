@@ -12,7 +12,7 @@
 // verifyFirebaseIdToken in app.ts).
 import { readFileSync } from 'fs';
 import crypto from 'crypto';
-import { firebaseStorageBucket } from '../../src/lib/firebase.js';
+import { firebaseFirestoreDatabaseId, firebaseStorageBucket } from '../../src/lib/firebase.js';
 
 interface ServiceAccount {
   client_email: string;
@@ -83,6 +83,68 @@ async function getGoogleAccessToken(): Promise<string> {
   const data: any = await res.json();
   cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
   return cachedToken.token;
+}
+
+type FirestoreValue = Record<string, any>;
+
+function decodeFirestoreValue(value: FirestoreValue): any {
+  if ('nullValue' in value) return null;
+  if ('stringValue' in value) return value.stringValue;
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('integerValue' in value) return Number(value.integerValue);
+  if ('doubleValue' in value) return Number(value.doubleValue);
+  if ('timestampValue' in value) return value.timestampValue;
+  if ('referenceValue' in value) return value.referenceValue;
+  if ('bytesValue' in value) return value.bytesValue;
+  if ('geoPointValue' in value) return value.geoPointValue;
+  if ('arrayValue' in value) {
+    return (value.arrayValue?.values || []).map(decodeFirestoreValue);
+  }
+  if ('mapValue' in value) {
+    return decodeFirestoreFields(value.mapValue?.fields || {});
+  }
+  return undefined;
+}
+
+function decodeFirestoreFields(fields: Record<string, FirestoreValue>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [key, decodeFirestoreValue(value)])
+  );
+}
+
+/**
+ * Reads a Firestore collection through Google's authenticated REST API.
+ * This avoids the browser-oriented Firebase client SDK in the serverless
+ * product route and is considerably faster and more reliable on Vercel.
+ */
+export async function readFirestoreCollection<T>(collectionId: string): Promise<T[]> {
+  const accessToken = await getGoogleAccessToken();
+  const { project_id: projectId } = loadServiceAccount();
+  const documents: T[] = [];
+  let pageToken = '';
+
+  do {
+    const url = new URL(
+      `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(firebaseFirestoreDatabaseId)}/documents/${encodeURIComponent(collectionId)}`
+    );
+    url.searchParams.set('pageSize', '1000');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+      throw new Error(`Firestore REST read failed (HTTP ${response.status}): ${await response.text()}`);
+    }
+
+    const payload: any = await response.json();
+    for (const document of payload.documents || []) {
+      documents.push(decodeFirestoreFields(document.fields || {}) as T);
+    }
+    pageToken = payload.nextPageToken || '';
+  } while (pageToken);
+
+  return documents;
 }
 
 // Generates a real Firebase email-link sign-in URL without triggering

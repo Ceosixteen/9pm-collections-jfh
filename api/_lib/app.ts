@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
 import { db, setDoc, doc, collection, getDocs, deleteDoc, query, orderBy, limit, firebaseWebApiKey } from '../../src/lib/firebase.js';
-import { generateEmailSignInLink, uploadImageToStorage } from './firebaseAdmin.js';
+import { generateEmailSignInLink, readFirestoreCollection, uploadImageToStorage } from './firebaseAdmin.js';
 import { buildSignInEmailHtml } from './emailTemplates.js';
 import * as nineCollectionCatalog from './catalogs/nineCollection.js';
 import * as hawasCatalog from './catalogs/hawas.js';
@@ -1463,8 +1463,7 @@ ${recentChatContext}
   app.get('/api/products', async (req, res) => {
     try {
       const collectionSlug = typeof req.query.collection === 'string' ? req.query.collection : '';
-      const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
-      let products = snapshot.docs.map((d) => d.data() as StoredProduct);
+      let products = await readFirestoreCollection<StoredProduct>('products');
       if (collectionSlug) {
         products = products.filter((p) => p.collectionSlug === collectionSlug);
       }
