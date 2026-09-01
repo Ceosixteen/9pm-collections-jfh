@@ -2027,15 +2027,21 @@ ${recentChatContext}
   });
 
   app.get('/api/telegram/config', requireAdminAuth, (req, res) => {
+    const configuredToken = process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken;
     return res.json({
       ...currentTelegramConfig,
-      botToken: process.env.TELEGRAM_BOT_TOKEN || currentTelegramConfig.botToken,
+      // Never send the bot credential back to a browser, even an admin one.
+      botToken: '',
+      botConfigured: Boolean(configuredToken),
       chatId: process.env.TELEGRAM_CHAT_ID || currentTelegramConfig.chatId,
     });
   });
   app.post('/api/telegram/config', requireAdminAuth, (req, res) => {
     currentTelegramConfig = { ...currentTelegramConfig, ...req.body };
-    return res.json({ success: true, config: currentTelegramConfig });
+    return res.json({
+      success: true,
+      config: { ...currentTelegramConfig, botToken: '', botConfigured: Boolean(currentTelegramConfig.botToken || process.env.TELEGRAM_BOT_TOKEN) },
+    });
   });
 
   // GET Orders from Firestore & memory
