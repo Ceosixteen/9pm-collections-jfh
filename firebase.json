@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-jubafashionhubth-009b6fff-c937-4908-9175-e0e10251d99e",
+      "rules": "firestore.rules"
+    }
+  ]
+}
