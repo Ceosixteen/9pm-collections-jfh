@@ -112,6 +112,38 @@ function decodeFirestoreFields(fields: Record<string, FirestoreValue>): Record<s
   );
 }
 
+function encodeFirestoreValue(value: any): FirestoreValue {
+  if (value === null) return { nullValue: null };
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('Firestore cannot store a non-finite number');
+    return Number.isInteger(value)
+      ? { integerValue: String(value) }
+      : { doubleValue: value };
+  }
+  if (Array.isArray(value)) {
+    return { arrayValue: { values: value.map(encodeFirestoreValue) } };
+  }
+  if (typeof value === 'object') {
+    return { mapValue: { fields: encodeFirestoreFields(value) } };
+  }
+  throw new Error(`Unsupported Firestore value type: ${typeof value}`);
+}
+
+function encodeFirestoreFields(value: Record<string, any>): Record<string, FirestoreValue> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, fieldValue]) => fieldValue !== undefined)
+      .map(([key, fieldValue]) => [key, encodeFirestoreValue(fieldValue)])
+  );
+}
+
+function firestoreDocumentUrl(projectId: string, collectionId: string, documentId?: string): string {
+  const base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(firebaseFirestoreDatabaseId)}/documents/${encodeURIComponent(collectionId)}`;
+  return documentId ? `${base}/${encodeURIComponent(documentId)}` : base;
+}
+
 /**
  * Reads a Firestore collection through Google's authenticated REST API.
  * This avoids the browser-oriented Firebase client SDK in the serverless
@@ -124,9 +156,7 @@ export async function readFirestoreCollection<T>(collectionId: string): Promise<
   let pageToken = '';
 
   do {
-    const url = new URL(
-      `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/${encodeURIComponent(firebaseFirestoreDatabaseId)}/documents/${encodeURIComponent(collectionId)}`
-    );
+    const url = new URL(firestoreDocumentUrl(projectId, collectionId));
     url.searchParams.set('pageSize', '1000');
     if (pageToken) url.searchParams.set('pageToken', pageToken);
 
@@ -145,6 +175,38 @@ export async function readFirestoreCollection<T>(collectionId: string): Promise<
   } while (pageToken);
 
   return documents;
+}
+
+export async function writeFirestoreDocument(
+  collectionId: string,
+  documentId: string,
+  value: Record<string, any>
+): Promise<void> {
+  const accessToken = await getGoogleAccessToken();
+  const { project_id: projectId } = loadServiceAccount();
+  const response = await fetch(firestoreDocumentUrl(projectId, collectionId, documentId), {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ fields: encodeFirestoreFields(value) }),
+  });
+  if (!response.ok) {
+    throw new Error(`Firestore REST write failed (HTTP ${response.status}): ${await response.text()}`);
+  }
+}
+
+export async function deleteFirestoreDocument(collectionId: string, documentId: string): Promise<void> {
+  const accessToken = await getGoogleAccessToken();
+  const { project_id: projectId } = loadServiceAccount();
+  const response = await fetch(firestoreDocumentUrl(projectId, collectionId, documentId), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Firestore REST delete failed (HTTP ${response.status}): ${await response.text()}`);
+  }
 }
 
 // Generates a real Firebase email-link sign-in URL without triggering

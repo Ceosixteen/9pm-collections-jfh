@@ -2,8 +2,14 @@ import express from 'express';
 import crypto from 'crypto';
 import { INITIAL_KNOWLEDGE_BASE, DEFAULT_TELEGRAM_CONFIG } from '../../src/pages/nine-collection/data/perfumesData.js';
 import { KnowledgeBase, TelegramConfig, Order } from '../../src/pages/nine-collection/types.js';
-import { db, setDoc, doc, collection, getDocs, deleteDoc, query, orderBy, limit, firebaseWebApiKey } from '../../src/lib/firebase.js';
-import { generateEmailSignInLink, readFirestoreCollection, uploadImageToStorage } from './firebaseAdmin.js';
+import { firebaseWebApiKey } from '../../src/lib/firebase.js';
+import {
+  deleteFirestoreDocument,
+  generateEmailSignInLink,
+  readFirestoreCollection,
+  uploadImageToStorage,
+  writeFirestoreDocument,
+} from './firebaseAdmin.js';
 import { buildSignInEmailHtml } from './emailTemplates.js';
 import * as nineCollectionCatalog from './catalogs/nineCollection.js';
 import * as hawasCatalog from './catalogs/hawas.js';
@@ -610,9 +616,7 @@ const LIVE_CATALOG_META: Record<string, { label: string; productType: string }> 
 async function resolveCatalog(storeSlug?: string): Promise<Catalog> {
   const slug = storeSlug && LIVE_CATALOG_META[storeSlug] ? storeSlug : 'nine-collection';
   try {
-    const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
-    const products = snapshot.docs
-      .map((item) => item.data() as StoredProduct)
+    const products = (await readFirestoreCollection<StoredProduct>('products'))
       .filter((product) => product.collectionSlug === slug && product.isActive !== false && (product.stockCount ?? 1) > 0)
       .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
     if (products.length > 0) {
@@ -897,7 +901,7 @@ async function saveOrderToFirestore(order: Order) {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      await setDoc(doc(db, 'orders', order.id), payload);
+      await writeFirestoreDocument('orders', order.id, payload);
       return; // success
     } catch (err) {
       lastErr = err;
@@ -912,7 +916,7 @@ async function saveOrderToFirestore(order: Order) {
 
 async function saveNotificationToFirestore(notification: Notification) {
   try {
-    await setDoc(doc(db, 'notifications', notification.id), stripUndefined(notification));
+    await writeFirestoreDocument('notifications', notification.id, stripUndefined(notification));
   } catch (err) {
     console.error('Failed to save notification to Firestore:', err);
   }
@@ -921,7 +925,7 @@ async function saveNotificationToFirestore(notification: Notification) {
 async function saveHelpRequestToFirestore(helpData: { customerPhone: string; customerQuery: string; telegramNotified: boolean }) {
   try {
     const id = `HELP-${Date.now()}`;
-    await setDoc(doc(db, 'helpRequests', id), {
+    await writeFirestoreDocument('helpRequests', id, {
       id,
       ...helpData,
       createdAt: new Date().toISOString(),
@@ -972,8 +976,7 @@ function generateAlexFallbackResponse(
 async function getAlexTelegramReply(incomingText: string, senderName: string): Promise<string> {
   let allOrders: Order[] = [...ordersStore];
   try {
-    const snapshot = await getDocs(query(collection(db, 'orders'), limit(50)));
-    const firestoreOrders = snapshot.docs.map(d => d.data() as Order);
+    const firestoreOrders = (await readFirestoreCollection<Order>('orders')).slice(0, 50);
     const orderMap = new Map<string, Order>();
     firestoreOrders.forEach(o => orderMap.set(o.id, o));
     allOrders.forEach(o => { if (!orderMap.has(o.id)) orderMap.set(o.id, o); });
@@ -984,8 +987,7 @@ async function getAlexTelegramReply(incomingText: string, senderName: string): P
 
   let helpRequests: any[] = [];
   try {
-    const snapshot = await getDocs(query(collection(db, 'helpRequests'), limit(20)));
-    helpRequests = snapshot.docs.map(d => d.data());
+    helpRequests = (await readFirestoreCollection<any>('helpRequests')).slice(0, 20);
   } catch (e) {
     // ignore
   }
@@ -1381,12 +1383,7 @@ ${recentChatContext}
       }
 
       let catalogue: StoredProduct[];
-      try {
-        catalogue = await readFirestoreCollection<StoredProduct>('products');
-      } catch {
-        const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
-        catalogue = snapshot.docs.map((document) => document.data() as StoredProduct);
-      }
+      catalogue = await readFirestoreCollection<StoredProduct>('products');
       const productsById = new Map(catalogue.map((product) => [product.id, product]));
       const verifiedItems = items.map((rawItem: any) => {
         const productId = typeof rawItem?.productId === 'string' ? rawItem.productId : '';
@@ -1518,7 +1515,7 @@ ${recentChatContext}
     try {
       const { storeSlug, path: pagePath } = req.body || {};
       const id = `pv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      await setDoc(doc(db, 'pageviews', id), {
+      await writeFirestoreDocument('pageviews', id, {
         id,
         storeSlug: storeSlug || 'unknown',
         path: pagePath || '/',
@@ -1540,17 +1537,7 @@ ${recentChatContext}
   app.get('/api/products', async (req, res) => {
     try {
       const collectionSlug = typeof req.query.collection === 'string' ? req.query.collection : '';
-      let products: StoredProduct[];
-      try {
-        products = await readFirestoreCollection<StoredProduct>('products');
-      } catch (restError) {
-        // Keep the shop available if Google's REST/OAuth path has a transient
-        // problem. The existing SDK reader uses the same database and remains
-        // a reliable fallback while the REST error is retained in Vercel logs.
-        console.warn('Firestore REST reader unavailable; using SDK fallback:', restError);
-        const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
-        products = snapshot.docs.map((document) => document.data() as StoredProduct);
-      }
+      let products = await readFirestoreCollection<StoredProduct>('products');
       if (collectionSlug) {
         products = products.filter((p) => p.collectionSlug === collectionSlug);
       }
@@ -1567,9 +1554,7 @@ ${recentChatContext}
   // GET Every product across every collection (admin dashboard)
   app.get('/api/admin/products', requireAdminAuth, async (req, res) => {
     try {
-      const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
-      const products = snapshot.docs
-        .map((d) => d.data() as StoredProduct)
+      const products = (await readFirestoreCollection<StoredProduct>('products'))
         .sort((a, b) => {
           const bySlug = (a.collectionSlug || '').localeCompare(b.collectionSlug || '');
           return bySlug !== 0 ? bySlug : (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
@@ -1615,7 +1600,7 @@ ${recentChatContext}
       if (!product.name || !product.collectionSlug) {
         return res.status(400).json({ error: 'name and collectionSlug are required' });
       }
-      await setDoc(doc(db, 'products', product.id), stripUndefined(product));
+      await writeFirestoreDocument('products', product.id, stripUndefined(product));
       return res.json({ success: true, product });
     } catch (err: any) {
       console.error('Error saving product:', err);
@@ -1639,7 +1624,7 @@ ${recentChatContext}
             failed.push({ name: raw?.name, error: 'Missing name or collectionSlug' });
             continue;
           }
-          await setDoc(doc(db, 'products', product.id), stripUndefined(product));
+          await writeFirestoreDocument('products', product.id, stripUndefined(product));
           saved.push(product);
         } catch (e: any) {
           failed.push({ name: raw?.name, error: e?.message || String(e) });
@@ -1675,7 +1660,7 @@ ${recentChatContext}
       const settled = await Promise.allSettled(
         cleanUrls.map(async (url) => {
           const product = await buildDraftProductFromUrl(url, collectionSlug);
-          await setDoc(doc(db, 'products', product.id), stripUndefined(product));
+          await writeFirestoreDocument('products', product.id, stripUndefined(product));
           return product;
         })
       );
@@ -1696,7 +1681,7 @@ ${recentChatContext}
   // DELETE Remove a product
   app.delete('/api/admin/products/:id', requireAdminAuth, async (req, res) => {
     try {
-      await deleteDoc(doc(db, 'products', req.params.id));
+      await deleteFirestoreDocument('products', req.params.id);
       return res.json({ success: true });
     } catch (err: any) {
       console.error('Error deleting product:', err);
@@ -1710,9 +1695,7 @@ ${recentChatContext}
   // fetches this to render the dynamic /collections/:slug page).
   app.get('/api/collections/:routeSlug', async (req, res) => {
     try {
-      const snapshot = await getDocs(query(collection(db, 'collections'), limit(200)));
-      const match = snapshot.docs
-        .map((d) => d.data() as StoredCollection)
+      const match = (await readFirestoreCollection<StoredCollection>('collections'))
         .find((c) => c.routeSlug === req.params.routeSlug && c.isActive !== false);
       if (!match) {
         return res.status(404).json({ error: 'Collection not found' });
@@ -1727,9 +1710,7 @@ ${recentChatContext}
   // GET Every collection (public — used for homepage/nav listings)
   app.get('/api/collections', async (req, res) => {
     try {
-      const snapshot = await getDocs(query(collection(db, 'collections'), limit(200)));
-      const collections = snapshot.docs
-        .map((d) => d.data() as StoredCollection)
+      const collections = (await readFirestoreCollection<StoredCollection>('collections'))
         .filter((c) => c.isActive !== false)
         .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
       return res.json(collections);
@@ -1742,9 +1723,7 @@ ${recentChatContext}
   // GET Every collection including inactive ones (admin dashboard)
   app.get('/api/admin/collections', requireAdminAuth, async (req, res) => {
     try {
-      const snapshot = await getDocs(query(collection(db, 'collections'), limit(200)));
-      const collections = snapshot.docs
-        .map((d) => d.data() as StoredCollection)
+      const collections = (await readFirestoreCollection<StoredCollection>('collections'))
         .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
       return res.json(collections);
     } catch (err) {
@@ -1760,7 +1739,7 @@ ${recentChatContext}
       if (!coll.label || !coll.routeSlug) {
         return res.status(400).json({ error: 'label and routeSlug are required' });
       }
-      await setDoc(doc(db, 'collections', coll.id), stripUndefined(coll));
+      await writeFirestoreDocument('collections', coll.id, stripUndefined(coll));
       return res.json({ success: true, collection: coll });
     } catch (err: any) {
       console.error('Error saving collection:', err);
@@ -1771,7 +1750,7 @@ ${recentChatContext}
   // DELETE Remove a collection (does not delete its products)
   app.delete('/api/admin/collections/:id', requireAdminAuth, async (req, res) => {
     try {
-      await deleteDoc(doc(db, 'collections', req.params.id));
+      await deleteFirestoreDocument('collections', req.params.id);
       return res.json({ success: true });
     } catch (err: any) {
       console.error('Error deleting collection:', err);
@@ -1846,7 +1825,7 @@ ${recentChatContext}
         return res.status(400).json({ error: 'A valid email is required' });
       }
       const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      await setDoc(doc(db, 'leads', id), {
+      await writeFirestoreDocument('leads', id, {
         id,
         email: trimmedEmail,
         source: source || 'homepage',
@@ -1863,10 +1842,7 @@ ${recentChatContext}
   // GET Captured leads (admin dashboard)
   app.get('/api/admin/leads', requireAdminAuth, async (req, res) => {
     try {
-      const q = query(collection(db, 'leads'), limit(1000));
-      const snapshot = await getDocs(q);
-      const leads = snapshot.docs
-        .map((d) => d.data())
+      const leads = (await readFirestoreCollection<any>('leads'))
         .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       return res.json(leads);
     } catch (err) {
@@ -1878,6 +1854,16 @@ ${recentChatContext}
   // Telegram Webhook Handler for Incoming Client Messages
   app.post('/api/telegram/webhook', async (req, res) => {
     try {
+      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
+      if (webhookSecret) {
+        const providedSecret = String(req.get('x-telegram-bot-api-secret-token') || '');
+        const expected = Buffer.from(webhookSecret);
+        const provided = Buffer.from(providedSecret);
+        if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+          return res.status(401).json({ ok: false });
+        }
+      }
+
       const update = req.body;
       const message = update?.message || update?.edited_message;
 
@@ -1930,12 +1916,17 @@ ${recentChatContext}
         return res.status(400).json({ error: 'Bot token required' });
       }
 
-      const host = req.headers['x-forwarded-host'] || req.headers.host;
-      const proto = req.headers['x-forwarded-proto'] || 'https';
-      const webhookUrl = `${proto}://${host}/api/telegram/webhook`;
-
-      const tgUrl = `https://api.telegram.org/bot${tokenToUse}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
-      const tgRes = await fetch(tgUrl);
+      const publicSiteUrl = (process.env.PUBLIC_SITE_URL || 'https://jubafashionhub.link').replace(/\/$/, '');
+      const webhookUrl = `${publicSiteUrl}/api/telegram/webhook`;
+      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
+      const tgRes = await fetch(`https://api.telegram.org/bot${tokenToUse}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl,
+          ...(webhookSecret ? { secret_token: webhookSecret } : {}),
+        }),
+      });
       const tgData: any = await tgRes.json();
 
       if (tgData && tgData.ok) {
@@ -2050,9 +2041,9 @@ ${recentChatContext}
   // GET Orders from Firestore & memory
   app.get('/api/orders', requireAdminAuth, async (req, res) => {
     try {
-      const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
-      const snapshot = await getDocs(q);
-      const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+      const firestoreOrders = (await readFirestoreCollection<Order>('orders'))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 100);
 
       const orderMap = new Map<string, Order>();
       firestoreOrders.forEach((o) => orderMap.set(o.id, o));
@@ -2085,9 +2076,7 @@ ${recentChatContext}
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      const q = query(collection(db, 'orders'), limit(1000));
-      const snapshot = await getDocs(q);
-      const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+      const firestoreOrders = await readFirestoreCollection<Order>('orders');
 
       const orderMap = new Map<string, Order>();
       firestoreOrders.forEach((o) => orderMap.set(o.id, o));
@@ -2111,9 +2100,7 @@ ${recentChatContext}
     try {
       let allOrders: Order[] = [];
       try {
-        const q = query(collection(db, 'orders'), limit(1000));
-        const snapshot = await getDocs(q);
-        const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+        const firestoreOrders = await readFirestoreCollection<Order>('orders');
         const orderMap = new Map<string, Order>();
         firestoreOrders.forEach((o) => orderMap.set(o.id, o));
         ordersStore.forEach((o) => {
@@ -2212,9 +2199,7 @@ ${recentChatContext}
     try {
       let allOrders: Order[] = [];
       try {
-        const q = query(collection(db, 'orders'), limit(500));
-        const snapshot = await getDocs(q);
-        const firestoreOrders: Order[] = snapshot.docs.map((d) => d.data() as Order);
+        const firestoreOrders = await readFirestoreCollection<Order>('orders');
         const orderMap = new Map<string, Order>();
         firestoreOrders.forEach((o) => orderMap.set(o.id, o));
         ordersStore.forEach((o) => {
@@ -2300,9 +2285,8 @@ ${recentChatContext}
   // GET Page-view traffic summary per landing page (admin dashboard)
   app.get('/api/admin/pageviews-summary', requireAdminAuth, async (req, res) => {
     try {
-      const q = query(collection(db, 'pageviews'), limit(5000));
-      const snapshot = await getDocs(q);
-      const views = snapshot.docs.map((d) => d.data() as { storeSlug?: string; createdAt?: string });
+      const views = (await readFirestoreCollection<{ storeSlug?: string; createdAt?: string }>('pageviews'))
+        .slice(0, 5000);
 
       const byStore: Record<string, number> = {};
       const byDay: Record<string, number> = {};
@@ -2323,9 +2307,9 @@ ${recentChatContext}
   // GET Customer Help Requests from Firestore
   app.get('/api/help-requests', requireAdminAuth, async (req, res) => {
     try {
-      const q = query(collection(db, 'helpRequests'), orderBy('createdAt', 'desc'), limit(50));
-      const snapshot = await getDocs(q);
-      const requests = snapshot.docs.map((d) => d.data());
+      const requests = (await readFirestoreCollection<any>('helpRequests'))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 50);
       return res.json(requests);
     } catch (err) {
       console.error('Error fetching help requests from Firestore:', err);
@@ -2340,9 +2324,7 @@ ${recentChatContext}
       let targetOrder = ordersStore.find((o) => o.id === id);
 
       if (!targetOrder) {
-        const q = query(collection(db, 'orders'), limit(100));
-        const snapshot = await getDocs(q);
-        const orders = snapshot.docs.map((d) => d.data() as Order);
+        const orders = await readFirestoreCollection<Order>('orders');
         targetOrder = orders.find((o) => o.id === id);
       }
 
@@ -2400,7 +2382,7 @@ ${recentChatContext}
   app.delete('/api/orders/:id', requireAdminAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      await deleteDoc(doc(db, 'orders', id));
+      await deleteFirestoreDocument('orders', id);
       // Also drop it from the in-memory store so it doesn't reappear in the
       // merged list until the serverless instance recycles.
       const idx = ordersStore.findIndex((o) => o.id === id);
@@ -2423,9 +2405,7 @@ ${recentChatContext}
 
       let targetOrder = ordersStore.find((o) => o.id === id);
       if (!targetOrder) {
-        const q = query(collection(db, 'orders'), limit(500));
-        const snapshot = await getDocs(q);
-        const orders = snapshot.docs.map((d) => d.data() as Order);
+        const orders = await readFirestoreCollection<Order>('orders');
         targetOrder = orders.find((o) => o.id === id);
       }
 
@@ -2494,10 +2474,7 @@ ${recentChatContext}
   // GET Campaign send history (admin dashboard).
   app.get('/api/admin/campaigns', requireAdminAuth, async (req, res) => {
     try {
-      const q = query(collection(db, 'notifications'), limit(1000));
-      const snapshot = await getDocs(q);
-      const campaigns = snapshot.docs
-        .map((d) => d.data() as Notification)
+      const campaigns = (await readFirestoreCollection<Notification>('notifications'))
         .filter((n) => n.type === 'campaign')
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       return res.json(campaigns);
@@ -2518,10 +2495,7 @@ ${recentChatContext}
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      const q = query(collection(db, 'notifications'), limit(1000));
-      const snapshot = await getDocs(q);
-      const mine = snapshot.docs
-        .map((d) => d.data() as Notification)
+      const mine = (await readFirestoreCollection<Notification>('notifications'))
         .filter((n) => n.audience === 'all' || n.targetEmail === email)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .map((n) => ({
@@ -2552,10 +2526,7 @@ ${recentChatContext}
         return res.status(401).json({ error: 'Sign in required' });
       }
 
-      const q = query(collection(db, 'notifications'), limit(1000));
-      const snapshot = await getDocs(q);
-      const mine = snapshot.docs
-        .map((d) => d.data() as Notification)
+      const mine = (await readFirestoreCollection<Notification>('notifications'))
         .filter((n) => n.audience === 'all' || n.targetEmail === email);
 
       await Promise.all(
