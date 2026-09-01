@@ -1463,7 +1463,17 @@ ${recentChatContext}
   app.get('/api/products', async (req, res) => {
     try {
       const collectionSlug = typeof req.query.collection === 'string' ? req.query.collection : '';
-      let products = await readFirestoreCollection<StoredProduct>('products');
+      let products: StoredProduct[];
+      try {
+        products = await readFirestoreCollection<StoredProduct>('products');
+      } catch (restError) {
+        // Keep the shop available if Google's REST/OAuth path has a transient
+        // problem. The existing SDK reader uses the same database and remains
+        // a reliable fallback while the REST error is retained in Vercel logs.
+        console.warn('Firestore REST reader unavailable; using SDK fallback:', restError);
+        const snapshot = await getDocs(query(collection(db, 'products'), limit(1000)));
+        products = snapshot.docs.map((document) => document.data() as StoredProduct);
+      }
       if (collectionSlug) {
         products = products.filter((p) => p.collectionSlug === collectionSlug);
       }
