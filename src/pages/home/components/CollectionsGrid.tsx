@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
+import { optimizeImageUrl } from '../../../lib/imageOptimization';
 
 interface CollectionCard {
   slug: string;
@@ -189,8 +190,10 @@ export const CollectionsGrid: React.FC = () => {
             >
               <div className="aspect-[4/5] w-full overflow-hidden bg-gradient-to-b from-white to-purple-50 flex items-center justify-center p-3 sm:p-5">
                 <img
-                  src={c.image}
+                  src={optimizeImageUrl(c.image, 480)}
                   alt={c.name}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                   referrerPolicy="no-referrer"
                 />

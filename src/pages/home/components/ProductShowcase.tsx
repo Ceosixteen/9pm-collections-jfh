@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { HomeProduct, BEST_SELLERS, NEW_ARRIVALS } from '../data/featuredProducts';
+import { optimizeImageUrl } from '../../../lib/imageOptimization';
 import { HomeProductModal } from './HomeProductModal';
 
 const COLLECTION_COLORS: Record<string, string> = {
@@ -109,8 +110,10 @@ function ProductCard({
         {/* Image */}
         <div className="relative bg-slate-50 h-36 sm:h-48 flex items-center justify-center p-3">
           <img
-            src={product.image}
+            src={optimizeImageUrl(product.image, 320)}
             alt={product.name}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
             referrerPolicy="no-referrer"
           />

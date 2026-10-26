@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { optimizeProductImages } from './imageOptimization';
 
 // Loads a storefront's products from the Firestore-backed API so the catalogue
 // can be managed from the admin dashboard at runtime.
@@ -6,8 +7,8 @@ import { useEffect, useState } from 'react';
 // The hardcoded data is passed in as `fallback` and rendered immediately, so
 // the page never flashes empty and still works if the API is unreachable —
 // live data simply swaps in once it arrives.
-export function useCollectionProducts<T>(collectionSlug: string, fallback: readonly T[]): T[] {
-  const [products, setProducts] = useState<T[]>(fallback as T[]);
+export function useCollectionProducts<T extends { image?: string }>(collectionSlug: string, fallback: readonly T[]): T[] {
+  const [products, setProducts] = useState<T[]>(() => optimizeProductImages(fallback));
 
   useEffect(() => {
     let cancelled = false;
@@ -16,7 +17,7 @@ export function useCollectionProducts<T>(collectionSlug: string, fallback: reado
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled && Array.isArray(data) && data.length > 0) {
-          setProducts(data as T[]);
+          setProducts(optimizeProductImages(data as T[]));
         }
       })
       .catch(() => {
